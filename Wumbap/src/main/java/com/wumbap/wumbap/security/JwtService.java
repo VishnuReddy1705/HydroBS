@@ -1,49 +1,37 @@
-// src/main/java/com/wumbap/wumbap/security/JwtService.java
 package com.wumbap.wumbap.security;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.function.Function;
 
 @Service
 public class JwtService {
+    @Value("${application.security.jwt.secret-key}")
+    private String secretKey;
 
-    @Value("${app.jwt.secret}")
-    private String secret;
-
-    @Value("${app.jwt.expiration-ms}")
-    private long expirationMs;
-
-    private SecretKey key() {
-        return Keys.hmacShaKeyFor(secret.getBytes());
+    public String extractUsername(String token) { return extractClaim(token, Claims::getSubject); }
+    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        return claimsResolver.apply(extractAllClaims(token));
     }
-
-    public String generateToken(String email, String role) {
-        Date now = new Date();
-        Date expiry = new Date(now.getTime() + expirationMs);
-        return Jwts.builder()
-                .subject(email)
-                .claim("role", role)
-                .issuedAt(now)
-                .expiration(expiry)
-                .signWith(key())
-                .compact();
+    public String generateToken(UserDetails userDetails) { return Jwts.builder()
+            .subject(userDetails.getUsername())
+            .issuedAt(new Date(System.currentTimeMillis()))
+            .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24))
+            .signWith(getSignInKey()).compact();
     }
-
-    public String extractEmail(String token) {
-        return Jwts.parser().verifyWith(key()).build()
-                .parseSignedClaims(token).getPayload().getSubject();
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        return extractUsername(token).equals(userDetails.getUsername()) && !extractAllClaims(token).getExpiration().before(new Date());
     }
-
-    public boolean isValid(String token) {
-        try {
-            Jwts.parser().verifyWith(key()).build().parseSignedClaims(token);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+    private Claims extractAllClaims(String token) {
+        return Jwts.parser().verifyWith(getSignInKey()).build().parseSignedClaims(token).getPayload();
     }
+    private SecretKey getSignInKey() { return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKey)); }
 }

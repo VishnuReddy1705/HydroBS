@@ -1,17 +1,22 @@
 package com.wumbap.wumbap.controller;
-import com.wumbap.wumbap.entity.*;
+
+import com.wumbap.wumbap.dto.CommunitySummary;
+import com.wumbap.wumbap.dto.JoinRequestResponse;
+import com.wumbap.wumbap.dto.MyJoinRequestResponse;
+import com.wumbap.wumbap.entity.Community;
+import com.wumbap.wumbap.entity.CommunityJoinRequest;
+import com.wumbap.wumbap.entity.JoinRequestStatus;
+import com.wumbap.wumbap.entity.User;
+import com.wumbap.wumbap.repository.CommunityJoinRequestRepository;
+import com.wumbap.wumbap.repository.CommunityRepository;
+import com.wumbap.wumbap.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import java.time.LocalDateTime;
-import com.wumbap.wumbap.dto.CommunitySummary;
-import com.wumbap.wumbap.dto.JoinRequestResponse;
-import com.wumbap.wumbap.entity.Community;
-import com.wumbap.wumbap.dto.MyJoinRequestResponse;
-import com.wumbap.wumbap.repository.*;
-import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -20,9 +25,7 @@ import java.util.List;
 public class CommunityController {
 
     private final CommunityRepository communityRepository;
-
     private final UserRepository userRepository;
-
     private final CommunityJoinRequestRepository joinRequestRepository;
 
     @GetMapping("/public")
@@ -42,11 +45,13 @@ public class CommunityController {
                 ))
                 .toList();
     }
+
     @PostMapping("/{communityId}/join-request")
     @PreAuthorize("hasRole('RESIDENT')")
     public ResponseEntity<?> sendJoinRequest(
             @PathVariable Long communityId,
-            Authentication authentication) {
+            Authentication authentication
+    ) {
 
         User resident = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Resident not found"));
@@ -77,19 +82,34 @@ public class CommunityController {
 
         return ResponseEntity.ok("Join request sent successfully.");
     }
+
     @GetMapping("/join-requests/pending")
     @PreAuthorize("hasRole('ADMIN')")
-    public List<JoinRequestResponse> pendingRequests(Authentication auth) {
-        User admin = userRepository.findByEmail(auth.getName())
+    public List<JoinRequestResponse> pendingRequests(Authentication authentication) {
+
+        User admin = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
+
         Long communityId = admin.getCommunity().getId();
 
-        return joinRequestRepository.findByCommunityIdAndStatus(communityId, JoinRequestStatus.PENDING)
+        return joinRequestRepository
+                .findByCommunityIdAndStatus(
+                        communityId,
+                        JoinRequestStatus.PENDING
+                )
                 .stream()
-                .map(r -> new JoinRequestResponse(r.getId(), r.getUser().getId(),
-                        r.getUser().getFullName(), r.getUser().getEmail(), r.getUser().getFlatNumber(), r.getRequestedAt()))
+                .map(request -> new JoinRequestResponse(
+                        request.getId(),
+                        request.getUser().getId(),
+                        request.getUser().getFullName(),
+                        request.getUser().getEmail(),
+                        request.getUser().getFlatNumber(),
+                        request.getCommunity().getName(),
+                        request.getRequestedAt()
+                ))
                 .toList();
     }
+
     @GetMapping("/my-requests")
     @PreAuthorize("hasRole('RESIDENT')")
     public List<MyJoinRequestResponse> myRequests(Authentication authentication) {
@@ -107,11 +127,13 @@ public class CommunityController {
                 ))
                 .toList();
     }
+
     @PostMapping("/join-requests/{requestId}/approve")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> approveJoinRequest(
             @PathVariable Long requestId,
-            Authentication authentication) {
+            Authentication authentication
+    ) {
 
         User admin = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
@@ -119,7 +141,6 @@ public class CommunityController {
         CommunityJoinRequest request = joinRequestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Join request not found"));
 
-        // Security check
         if (!request.getCommunity().getId().equals(admin.getCommunity().getId())) {
             return ResponseEntity.status(403)
                     .body("You cannot approve requests for another community.");
@@ -136,11 +157,13 @@ public class CommunityController {
 
         return ResponseEntity.ok("Resident approved successfully.");
     }
+
     @PostMapping("/join-requests/{requestId}/reject")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> rejectJoinRequest(
             @PathVariable Long requestId,
-            Authentication authentication) {
+            Authentication authentication
+    ) {
 
         User admin = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Admin not found"));

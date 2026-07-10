@@ -10,8 +10,17 @@ import java.util.Optional;
 public interface CommunityJoinRequestRepository extends JpaRepository<CommunityJoinRequest, Long> {
 
     /**
-     * Get all pending/approved/rejected requests
-     * for a particular community.
+     * All requests of a resident.
+     */
+    List<CommunityJoinRequest> findByUserId(Long userId);
+
+    /**
+     * All requests for a community.
+     */
+    List<CommunityJoinRequest> findByCommunityId(Long communityId);
+
+    /**
+     * Requests of a community filtered by status.
      */
     List<CommunityJoinRequest> findByCommunityIdAndStatus(
             Long communityId,
@@ -19,8 +28,8 @@ public interface CommunityJoinRequestRepository extends JpaRepository<CommunityJ
     );
 
     /**
-     * Check if a resident has already sent
-     * a request to this community.
+     * Check whether a resident already requested
+     * to join a particular community.
      */
     Optional<CommunityJoinRequest> findByUserIdAndCommunityId(
             Long userId,
@@ -28,21 +37,20 @@ public interface CommunityJoinRequestRepository extends JpaRepository<CommunityJ
     );
 
     /**
-     * Get all requests created by a resident.
-     */
-    List<CommunityJoinRequest> findByUserId(Long userId);
-
-    /**
-     * Get all requests for a community.
-     */
-    List<CommunityJoinRequest> findByCommunityId(Long communityId);
-
-    /**
-     * Check if a resident already has
-     * an APPROVED request.
+     * Check whether a resident already has a request
+     * with a particular status.
      */
     Optional<CommunityJoinRequest> findByUserIdAndStatus(
             Long userId,
             JoinRequestStatus status
     );
+
+    /**
+     * Dashboard statistics.
+     */
+    long countByCommunityIdAndStatus(
+            Long communityId,
+            JoinRequestStatus status
+    );
+
 }

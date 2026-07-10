@@ -6,7 +6,14 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "community_join_requests")
+@Table(
+        name = "community_join_requests",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        columnNames = {"user_id", "community_id"}
+                )
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -18,19 +25,19 @@ public class CommunityJoinRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "community_id", nullable = false)
     private Community community;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private JoinRequestStatus status;
 
-    @Column(name = "requested_at", nullable = false)
+    @Column(name = "requested_at", nullable = false, updatable = false)
     private LocalDateTime requestedAt;
 
     @Column(name = "decided_at")
@@ -38,6 +45,7 @@ public class CommunityJoinRequest {
 
     @PrePersist
     public void prePersist() {
+
         requestedAt = LocalDateTime.now();
 
         if (status == null) {

@@ -1,0 +1,8 @@
+-- ===========================================
+-- V4__create_meter_readings.sql
+-- ===========================================
+-- Meter readings were moved into
+-- V3__water_management.sql.
+--
+-- This migration is intentionally left empty
+-- to preserve Flyway version numbering.

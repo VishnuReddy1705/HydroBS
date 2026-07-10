@@ -1,10 +1,17 @@
 package com.wumbap.wumbap.dto;
 
-import jakarta.validation.constraints.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-public record RegisterResidentRequest(
-        @NotBlank String fullName,
-        @Email @NotBlank String email,
-        @NotBlank @Size(min = 8) String password,
-        @NotBlank String flatNumber
-) {}
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class RegisterResidentRequest {
+    private String fullName;
+    private String email;
+    private String password;
+    private String flatNumber;
+}

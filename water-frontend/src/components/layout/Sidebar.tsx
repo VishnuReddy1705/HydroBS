@@ -1,127 +1,92 @@
-import { NavLink, useNavigate } from "react-router-dom"
-import { LogOut, Droplets } from "lucide-react"
-import { clearSession, getName } from "@/lib/auth"
-import { Button } from "@/components/ui/button"
+import { useNavigate } from "react-router-dom"
+import {
+  LayoutDashboard, Building2, Users, Droplet, Gauge, Receipt, FileText,
+  ShoppingCart, FileSpreadsheet, Bell, BarChart3, UserCircle, LogOut,
+  Settings, History, CreditCard, Lightbulb, type LucideIcon,
+} from "lucide-react"
+import { clearSession } from "@/lib/auth"
 
-type SidebarItem = {
-  title: string
-  href: string
-  icon: any
+interface NavItem {
+  label: string
+  icon: LucideIcon
+  active?: boolean
+}
+
+const NAV_ITEMS: Record<"SUPER_ADMIN" | "ADMIN" | "RESIDENT", NavItem[]> = {
+  SUPER_ADMIN: [
+    { label: "Dashboard", icon: LayoutDashboard, active: true },
+    { label: "Communities", icon: Building2 },
+    { label: "Users", icon: Users },
+    { label: "Reports", icon: BarChart3 },
+    { label: "Settings", icon: Settings },
+  ],
+  ADMIN: [
+    { label: "Dashboard", icon: LayoutDashboard, active: true },
+    { label: "Residents", icon: Users },
+    { label: "Water Usage", icon: Droplet },
+    { label: "Meter Readings", icon: Gauge },
+    { label: "Billing", icon: Receipt },
+    { label: "Tariff Plans", icon: FileText },
+    { label: "Water Purchase", icon: ShoppingCart },
+    { label: "Invoices", icon: FileSpreadsheet },
+    { label: "Alerts", icon: Bell },
+    { label: "Reports", icon: BarChart3 },
+    { label: "Profile", icon: UserCircle },
+  ],
+  RESIDENT: [
+    { label: "Dashboard", icon: LayoutDashboard, active: true },
+    { label: "My Usage", icon: Droplet },
+    { label: "Usage History", icon: History },
+    { label: "My Bills", icon: CreditCard },
+    { label: "My Invoices", icon: FileText },
+    { label: "Notifications", icon: Bell },
+    { label: "Water Tips", icon: Lightbulb },
+    { label: "Profile", icon: UserCircle },
+  ],
 }
 
 interface SidebarProps {
-  items: SidebarItem[]
+  role: "SUPER_ADMIN" | "ADMIN" | "RESIDENT"
 }
 
-export default function Sidebar({ items }: SidebarProps) {
+export default function Sidebar({ role }: SidebarProps) {
   const navigate = useNavigate()
-
-  function logout() {
-    clearSession()
-    navigate("/login")
-  }
+  const items = NAV_ITEMS[role]
 
   return (
-    <aside className="w-72 h-screen bg-slate-950 border-r border-slate-800 flex flex-col">
-
-      {/* Logo */}
-
-      <div className="h-20 flex items-center px-7 border-b border-slate-800">
-
-        <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center">
-
-          <Droplets className="text-white h-6 w-6" />
-
+    <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 flex-col border-r border-white/10 bg-white/5 backdrop-blur-2xl lg:flex text-white">
+      <div className="flex items-center gap-2 px-6 py-6 border-b border-white/10">
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 border border-white/20 shadow-md">
+          <Droplet className="h-4.5 w-4.5 text-white" />
         </div>
-
-        <div className="ml-4">
-
-          <h1 className="text-white font-bold text-2xl">
-            HydroBS
-          </h1>
-
-          <p className="text-slate-400 text-xs">
-            Smart Water Platform
-          </p>
-
-        </div>
-
+        <span className="text-xl font-extrabold tracking-wider text-white">HydroBS</span>
       </div>
 
-      {/* Navigation */}
-
-      <nav className="flex-1 py-6 overflow-y-auto">
-
-        {items.map((item) => {
-
-          const Icon = item.icon
-
-          if (item.title === "Logout") return null
-
-          return (
-
-            <NavLink
-              key={item.title}
-              to={item.href}
-              className={({ isActive }) =>
-                `mx-4 mb-2 flex items-center gap-4 rounded-xl px-5 py-4 transition-all
-                ${
-                  isActive
-                    ? "bg-blue-600 text-white shadow-lg"
-                    : "text-slate-400 hover:bg-slate-900 hover:text-white"
-                }`
-              }
-            >
-
-              <Icon size={22} />
-
-              <span className="font-medium">
-
-                {item.title}
-
-              </span>
-
-            </NavLink>
-
-          )
-
-        })}
-
+      <nav className="flex-1 space-y-1.5 overflow-y-auto px-4 py-6">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition-all duration-250 cursor-pointer ${
+              item.active
+                ? "bg-white/15 border-l-2 border-white text-white font-bold shadow-lg shadow-white/5"
+                : "text-white/70 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <item.icon className={`h-[18px] w-[18px] ${item.active ? "text-white" : "text-white/70"}`} />
+            {item.label}
+          </div>
+        ))}
       </nav>
 
-      {/* Bottom */}
-
-      <div className="border-t border-slate-800 p-5">
-
-        <div className="mb-5">
-
-          <p className="text-white font-semibold">
-
-            {getName()}
-
-          </p>
-
-          <p className="text-slate-400 text-sm">
-
-            Logged In
-
-          </p>
-
-        </div>
-
-        <Button
-          onClick={logout}
-          className="w-full bg-red-600 hover:bg-red-700 flex items-center gap-2"
+      <div className="border-t border-white/10 p-4 bg-white/5">
+        <button
+          onClick={() => { clearSession(); navigate("/login") }}
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm text-white/70 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
         >
-
-          <LogOut size={18} />
-
+          <LogOut className="h-[18px] w-[18px]" />
           Logout
-
-        </Button>
-
+        </button>
       </div>
-
     </aside>
   )
 }

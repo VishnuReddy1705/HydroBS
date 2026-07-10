@@ -1,194 +1,149 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate, Link, useLocation } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Droplet, Loader2 } from "lucide-react";
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { saveSession } from '@/lib/auth';
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
-import { loginSchema, type LoginFormValues } from "@/lib/validation";
-import { api } from "@/lib/axios";
-import { getMe } from "@/lib/community";
-import { saveSession } from "@/lib/auth";
-
-export default function Login() {
+export default function HydroBSLogin() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const [credentials, setCredentials] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const [serverError, setServerError] = useState("");
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCredentials({ ...credentials, [e.target.name]: e.target.value });
+  };
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-  });
-
-  const onSubmit = async (values: LoginFormValues) => {
-    setServerError("");
+  const handleLoginSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
 
     try {
-      // Login
-      const { data } = await api.post("/api/auth/login", values);
+      const response = await fetch('http://localhost:8080/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
 
-      // Save JWT properly
-      saveSession(data.token, data.role, data.fullName);
+      const data = await response.json();
 
-      // Get logged-in user
-      const me = await getMe();
-
-      // Redirect
-      switch (me.role) {
-        case "ADMIN":
-          navigate("/admin-dashboard");
-          break;
-
-        case "RESIDENT":
-          navigate("/resident-dashboard");
-          break;
-
-        case "SUPER_ADMIN":
-          // Temporary until we build the Super Admin dashboard
-          navigate("/admin-dashboard");
-          break;
-
-        default:
-          navigate("/login");
+      if (!response.ok) {
+        throw new Error(data.message || 'Invalid email or password.');
       }
+
+      console.log('Login successful! Session data:', data);
+      
+      // Save session details
+      saveSession(data.token, data.role, data.fullName || 'User');
+      
+      // Redirect based on role
+      if (data.role === 'SUPER_ADMIN') {
+        navigate('/super-admin/dashboard');
+      } else if (data.role === 'ADMIN') {
+        navigate('/admin/dashboard');
+      } else if (data.role === 'RESIDENT') {
+        navigate('/resident/dashboard');
+      } else {
+        throw new Error('Unknown user role.');
+      }
+
     } catch (err: any) {
-      setServerError(err.response?.data ?? "Invalid email or password");
+      setError(err.message || 'Could not connect to the server.');
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleCreateCommunity = () => {
+    navigate('/register/admin');
+  };
+
+  const handleJoinCommunity = () => {
+    navigate('/register/resident');
+  };
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-blue-700 via-blue-500 to-cyan-400 flex items-center justify-center px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 w-full max-w-sm rounded-2xl border border-white/30 bg-white/15 backdrop-blur-xl shadow-2xl p-8"
-      >
-        <div className="flex flex-col items-center mb-6 text-center">
-          <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center mb-3">
-            <Droplet className="h-6 w-6 text-white" />
-          </div>
-
-          <h1 className="text-2xl font-semibold text-white">
-            HydroBS
-          </h1>
-
-          <p className="text-xs text-white/70 mt-1">
-            Smart Water Intelligence Platform
-          </p>
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-slate-800 to-sky-900 flex flex-col items-center justify-center p-4 antialiased font-sans">
+      
+      <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl w-full max-w-md transition-all duration-300">
+        
+        {/* HydroBS Water Droplet Icon */}
+        <div className="mx-auto w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mb-3 border border-white/10">
+          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 22c4.418 0 8-3.582 8-8 0-4.42-8-12-8-12S4 9.58 4 14c0 4.418 3.582 8 8 8z" />
+          </svg>
         </div>
 
-        {location.state?.registered && (
-          <div className="mb-4 rounded-lg border border-green-400/40 bg-green-500/20 p-3 text-center text-sm text-green-100">
-            Account created successfully. Please log in.
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-extrabold tracking-wide text-white drop-shadow-sm">HydroBS</h1>
+          <p className="text-sm text-white/80 mt-1.5">Sign in to manage your community water monitor</p>
+        </div>
+
+        {/* Error Message Feedback Banner */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/40 text-white rounded-xl text-xs font-semibold text-center tracking-wide">
+            ⚠️ {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-
+        {/* Direct Login Form */}
+        <form onSubmit={handleLoginSubmit} className="space-y-5">
           <div>
-            <Label className="text-white">Email</Label>
-
-            <Input
+            <label className="block text-xs font-medium text-white/90 mb-1.5 pl-1 tracking-wider uppercase">Email Address</label>
+            <input
               type="email"
+              name="email"
               placeholder="you@example.com"
-              className="bg-white/10 border-white/30 text-white placeholder:text-white/50"
-              {...register("email")}
+              value={credentials.email}
+              onChange={handleInputChange}
+              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-300 transition-all"
+              required
+              disabled={loading}
             />
-
-            {errors.email && (
-              <p className="text-xs text-red-200 mt-1">
-                {errors.email.message}
-              </p>
-            )}
           </div>
 
           <div>
-            <Label className="text-white">Password</Label>
-
-            <Input
+            <label className="block text-xs font-medium text-white/90 mb-1.5 pl-1 tracking-wider uppercase">Password</label>
+            <input
               type="password"
+              name="password"
               placeholder="••••••••"
-              className="bg-white/10 border-white/30 text-white placeholder:text-white/50"
-              {...register("password")}
+              value={credentials.password}
+              onChange={handleInputChange}
+              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-300 transition-all"
+              required
+              disabled={loading}
             />
-
-            {errors.password && (
-              <p className="text-xs text-red-200 mt-1">
-                {errors.password.message}
-              </p>
-            )}
           </div>
 
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className="text-xs text-white/70 hover:text-white"
-            >
-              Forgot Password?
-            </button>
-          </div>
-
-          {serverError && (
-            <p className="text-center text-xs text-red-200">
-              {serverError}
-            </p>
-          )}
-
-          <Button
+          <button
             type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-white text-blue-700 hover:bg-white/90 h-10"
+            disabled={loading}
+            className="w-full bg-white text-blue-600 font-bold py-3.5 rounded-xl hover:bg-white/90 active:scale-[0.99] transition-all shadow-xl text-sm tracking-wide mt-4 disabled:opacity-50 flex items-center justify-center"
           >
-            {isSubmitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              "Login"
-            )}
-          </Button>
+            {loading ? 'Logging in...' : 'Log In'}
+          </button>
         </form>
 
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-white/20" />
-          </div>
-
-          <div className="relative flex justify-center">
-            <span className="bg-transparent px-2 text-xs uppercase text-white/60">
-              or
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            asChild
-            variant="outline"
-            className="border-white/30 bg-transparent text-white hover:bg-white/10"
-          >
-            <Link to="/register/admin">
+        <div className="mt-8 pt-6 border-t border-white/10">
+          <div className="flex items-center justify-between gap-4">
+            <button
+              onClick={handleCreateCommunity}
+              className="flex-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white py-3 px-4 rounded-xl text-xs font-bold tracking-wide transition-all shadow-sm active:scale-[0.98] text-center"
+            >
               Create Community
-            </Link>
-          </Button>
-
-          <Button
-            asChild
-            variant="outline"
-            className="border-white/30 bg-transparent text-white hover:bg-white/10"
-          >
-            <Link to="/register/resident">
+            </button>
+            <button
+              onClick={handleJoinCommunity}
+              className="flex-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white py-3 px-4 rounded-xl text-xs font-bold tracking-wide transition-all shadow-sm active:scale-[0.98] text-center"
+            >
               Join Community
-            </Link>
-          </Button>
+            </button>
+          </div>
         </div>
-      </motion.div>
+
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ public record MeResponse(
         String email,
         String role,
         Long communityId,
-        String communityName
+        String communityName,
+        String flatNumber
 ) {
 }

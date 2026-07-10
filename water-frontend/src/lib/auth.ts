@@ -1,4 +1,3 @@
-// src/lib/auth.ts
 const TOKEN_KEY = "hydrobs_token"
 const ROLE_KEY = "hydrobs_role"
 const NAME_KEY = "hydrobs_name"

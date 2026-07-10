@@ -1,9 +1,13 @@
-// src/main/java/com/wumbap/wumbap/dto/LoginRequest.java
 package com.wumbap.wumbap.dto;
 
-import jakarta.validation.constraints.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-public record LoginRequest(
-        @Email @NotBlank String email,
-        @NotBlank String password
-) {}
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class LoginRequest {
+    private String email;
+    private String password;
+}

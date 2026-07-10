@@ -5,5 +5,4 @@ public record MyJoinRequestResponse(
         Long communityId,
         String communityName,
         String status
-) {
-}
+) {}
