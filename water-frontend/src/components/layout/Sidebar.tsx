@@ -1,46 +1,53 @@
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import {
   LayoutDashboard, Building2, Users, Droplet, Gauge, Receipt, FileText,
   ShoppingCart, FileSpreadsheet, Bell, BarChart3, UserCircle, LogOut,
-  Settings, History, CreditCard, Lightbulb, type LucideIcon,
+  Settings, History, CreditCard, Lightbulb, Calendar, type LucideIcon,
+  TrendingUp, Layers
 } from "lucide-react"
 import { clearSession } from "@/lib/auth"
+import { motion } from "framer-motion"
 
 interface NavItem {
   label: string
   icon: LucideIcon
-  active?: boolean
 }
 
 const NAV_ITEMS: Record<"SUPER_ADMIN" | "ADMIN" | "RESIDENT", NavItem[]> = {
   SUPER_ADMIN: [
-    { label: "Dashboard", icon: LayoutDashboard, active: true },
+    { label: "Dashboard", icon: LayoutDashboard },
     { label: "Communities", icon: Building2 },
     { label: "Users", icon: Users },
     { label: "Reports", icon: BarChart3 },
+    { label: "Visualizations", icon: TrendingUp },
     { label: "Settings", icon: Settings },
   ],
   ADMIN: [
-    { label: "Dashboard", icon: LayoutDashboard, active: true },
+    { label: "Dashboard", icon: LayoutDashboard },
     { label: "Residents", icon: Users },
     { label: "Water Usage", icon: Droplet },
     { label: "Meter Readings", icon: Gauge },
     { label: "Billing", icon: Receipt },
     { label: "Tariff Plans", icon: FileText },
+    { label: "Billing Cycles", icon: Layers },
     { label: "Water Purchase", icon: ShoppingCart },
     { label: "Invoices", icon: FileSpreadsheet },
+    { label: "Calendar", icon: Calendar },
     { label: "Alerts", icon: Bell },
     { label: "Reports", icon: BarChart3 },
+    { label: "Visualizations", icon: TrendingUp },
     { label: "Profile", icon: UserCircle },
   ],
   RESIDENT: [
-    { label: "Dashboard", icon: LayoutDashboard, active: true },
+    { label: "Dashboard", icon: LayoutDashboard },
     { label: "My Usage", icon: Droplet },
     { label: "Usage History", icon: History },
     { label: "My Bills", icon: CreditCard },
     { label: "My Invoices", icon: FileText },
+    { label: "Calendar", icon: Calendar },
     { label: "Notifications", icon: Bell },
     { label: "Water Tips", icon: Lightbulb },
+    { label: "Visualizations", icon: TrendingUp },
     { label: "Profile", icon: UserCircle },
   ],
 }
@@ -51,39 +58,138 @@ interface SidebarProps {
 
 export default function Sidebar({ role }: SidebarProps) {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const items = NAV_ITEMS[role]
+  
+  const currentTab = searchParams.get("tab") || "dashboard"
+  
+  const getTabKey = (label: string) => {
+    return label.toLowerCase().replace(" ", "-")
+  }
+
+  const handleItemClick = (label: string) => {
+    const tabKey = getTabKey(label)
+    if (tabKey === "profile" && role === "RESIDENT") {
+      navigate("/resident/profile")
+      return
+    }
+
+    if (role === "ADMIN" || role === "SUPER_ADMIN") {
+      if (tabKey === "billing-cycles") {
+        navigate("/admin/billing-cycles")
+        return
+      }
+      if (tabKey === "water-purchase") {
+        navigate("/admin/bulk-purchases")
+        return
+      }
+      if (tabKey === "meter-readings") {
+        navigate("/admin/readings")
+        return
+      }
+      if (tabKey === "water-usage") {
+        navigate("/admin/meters")
+        return
+      }
+      if (tabKey === "visualizations") {
+        navigate("/admin/water-analytics")
+        return
+      }
+      if (tabKey === "billing") {
+        navigate("/admin/billing")
+        return
+      }
+      if (tabKey === "tariff-plans") {
+        navigate("/admin/billing-settings")
+        return
+      }
+      if (tabKey === "invoices") {
+        navigate("/admin/billing")
+        return
+      }
+      if (tabKey === "reports") {
+        navigate(role === "SUPER_ADMIN" ? "/super-admin/billing-dashboard" : "/admin/billing-dashboard")
+        return
+      }
+    }
+    
+    // Redirect back to dashboard if navigating other tabs
+    const targetPath = role === "SUPER_ADMIN" 
+      ? "/super-admin/dashboard" 
+      : role === "ADMIN" 
+      ? "/admin/dashboard" 
+      : "/resident/dashboard"
+
+    if (tabKey === "dashboard") {
+      setSearchParams({})
+      navigate(targetPath)
+    } else {
+      setSearchParams({ tab: tabKey })
+      navigate(`${targetPath}?tab=${tabKey}`)
+    }
+  }
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 flex-col border-r border-white/10 bg-white/5 backdrop-blur-2xl lg:flex text-white">
-      <div className="flex items-center gap-2 px-6 py-6 border-b border-white/10">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 border border-white/20 shadow-md">
-          <Droplet className="h-4.5 w-4.5 text-white" />
+    <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 flex-col bg-gradient-to-b from-[#0F4C81] via-[#0B3A63] to-[#062038] text-white lg:flex shadow-[4px_0_24px_rgba(15,76,129,0.15)] border-r border-[#00B4D8]/10 select-none">
+      
+      {/* Sidebar Header Brand with flow element */}
+      <div className="flex items-center gap-3 px-6 py-6 border-b border-white/5 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[#00B4D8]/5 pointer-events-none" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#48CAE4] to-[#00B4D8] shadow-lg border border-white/20">
+          <Droplet className="h-5 w-5 text-white fill-white/10" />
         </div>
-        <span className="text-xl font-extrabold tracking-wider text-white">HydroBS</span>
+        <div>
+          <span className="text-2xl font-extrabold tracking-wider bg-clip-text bg-gradient-to-r from-white to-[#48CAE4]">
+            HydroBS
+          </span>
+          <span className="block text-[10px] tracking-widest text-[#00B4D8]/80 font-bold uppercase mt-0.5 pl-0.5">
+            Smart Utility
+          </span>
+        </div>
       </div>
 
-      <nav className="flex-1 space-y-1.5 overflow-y-auto px-4 py-6">
-        {items.map((item) => (
-          <div
-            key={item.label}
-            className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition-all duration-250 cursor-pointer ${
-              item.active
-                ? "bg-white/15 border-l-2 border-white text-white font-bold shadow-lg shadow-white/5"
-                : "text-white/70 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            <item.icon className={`h-[18px] w-[18px] ${item.active ? "text-white" : "text-white/70"}`} />
-            {item.label}
-          </div>
-        ))}
+      {/* Navigation Options list */}
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3.5 py-6 custom-scrollbar">
+        {items.map((item) => {
+          const tabKey = getTabKey(item.label)
+          const isActive = currentTab === tabKey
+          
+          return (
+            <button
+              key={item.label}
+              onClick={() => handleItemClick(item.label)}
+              className={`flex w-full items-center gap-3 rounded-2xl px-4.5 py-3.5 text-sm transition-all duration-200 cursor-pointer group relative ${
+                isActive
+                  ? "text-white font-bold"
+                  : "text-slate-300 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="active-indicator"
+                  className="absolute inset-0 bg-gradient-to-r from-[#00B4D8]/15 to-transparent border-l-[3px] border-[#00B4D8] rounded-2xl pointer-events-none"
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              <item.icon className={`h-[18px] w-[18px] transition-transform duration-200 group-hover:scale-110 z-10 ${isActive ? "text-[#00B4D8]" : "text-slate-400 group-hover:text-white"}`} />
+              <span className="z-10">{item.label}</span>
+              
+              {/* Subtle active pill dot */}
+              {isActive && (
+                <span className="absolute right-4 h-1.5 w-1.5 rounded-full bg-[#00B4D8] z-10" />
+              )}
+            </button>
+          )
+        })}
       </nav>
 
-      <div className="border-t border-white/10 p-4 bg-white/5">
+      {/* Logout foot action */}
+      <div className="border-t border-white/5 p-4 bg-black/10">
         <button
           onClick={() => { clearSession(); navigate("/login") }}
-          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm text-white/70 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+          className="flex w-full items-center gap-3 rounded-2xl px-4.5 py-3.5 text-sm text-slate-300 hover:bg-[#rose]/10 hover:text-rose-300 transition-all duration-200 cursor-pointer hover:bg-rose-500/10"
         >
-          <LogOut className="h-[18px] w-[18px]" />
+          <LogOut className="h-[18px] w-[18px] text-slate-400 group-hover:text-rose-300" />
           Logout
         </button>
       </div>

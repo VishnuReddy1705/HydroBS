@@ -1,9 +1,9 @@
-package com;
+package com.wumbap.wumbap;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
+@SpringBootTest(classes = WumbapApplication.class)
 class WumbapApplicationTests {
 
 	@Test

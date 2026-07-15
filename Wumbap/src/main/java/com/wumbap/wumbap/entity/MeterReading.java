@@ -54,6 +54,16 @@ public class MeterReading {
     @Column(name = "usage_litres", precision = 12, scale = 2)
     private BigDecimal usageLitres;
 
+    @Column(name = "is_anomaly")
+    @Builder.Default
+    private Boolean isAnomaly = false;
+
+    @Column(name = "anomaly_type", length = 100)
+    private String anomalyType;
+
+    @Column(name = "anomaly_notes")
+    private String anomalyNotes;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

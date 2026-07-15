@@ -5,6 +5,6 @@ export default function ProtectedRoute({ allowedRole }: { allowedRole: "SUPER_AD
   const token = getToken()
   const role = getRole()
   if (!token) return <Navigate to="/login" replace />
-  if (role !== allowedRole) return <Navigate to="/login" replace />
+  if (role !== allowedRole && !(allowedRole === "ADMIN" && role === "SUPER_ADMIN")) return <Navigate to="/login" replace />
   return <Outlet />
 }

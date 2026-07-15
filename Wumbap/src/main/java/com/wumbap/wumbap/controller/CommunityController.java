@@ -6,6 +6,7 @@ import com.wumbap.wumbap.dto.MyJoinRequestResponse;
 import com.wumbap.wumbap.entity.Community;
 import com.wumbap.wumbap.entity.CommunityJoinRequest;
 import com.wumbap.wumbap.entity.JoinRequestStatus;
+import com.wumbap.wumbap.entity.Role;
 import com.wumbap.wumbap.entity.User;
 import com.wumbap.wumbap.repository.CommunityJoinRequestRepository;
 import com.wumbap.wumbap.repository.CommunityRepository;
@@ -27,6 +28,7 @@ public class CommunityController {
     private final CommunityRepository communityRepository;
     private final UserRepository userRepository;
     private final CommunityJoinRequestRepository joinRequestRepository;
+    private final com.wumbap.wumbap.service.AuditLogService auditLogService;
 
     @GetMapping("/public")
     public List<CommunitySummary> getCommunities(
@@ -84,20 +86,31 @@ public class CommunityController {
     }
 
     @GetMapping("/join-requests/pending")
-    @PreAuthorize("hasRole('ADMIN')")
-    public List<JoinRequestResponse> pendingRequests(Authentication authentication) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public List<JoinRequestResponse> pendingRequests(
+            @RequestParam(required = false) Long communityId,
+            Authentication authentication
+    ) {
 
         User admin = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
-        Long communityId = admin.getCommunity().getId();
+        Long targetCommunityId = communityId;
+        if (admin.getRole() != Role.SUPER_ADMIN) {
+            if (admin.getCommunity() == null) {
+                return List.of();
+            }
+            targetCommunityId = admin.getCommunity().getId();
+        }
 
-        return joinRequestRepository
-                .findByCommunityIdAndStatus(
-                        communityId,
-                        JoinRequestStatus.PENDING
-                )
-                .stream()
+        List<CommunityJoinRequest> requests;
+        if (targetCommunityId == null) {
+            requests = joinRequestRepository.findByStatus(JoinRequestStatus.PENDING);
+        } else {
+            requests = joinRequestRepository.findByCommunityIdAndStatus(targetCommunityId, JoinRequestStatus.PENDING);
+        }
+
+        return requests.stream()
                 .map(request -> new JoinRequestResponse(
                         request.getId(),
                         request.getUser().getId(),
@@ -129,7 +142,7 @@ public class CommunityController {
     }
 
     @PostMapping("/join-requests/{requestId}/approve")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<?> approveJoinRequest(
             @PathVariable Long requestId,
             Authentication authentication
@@ -141,9 +154,11 @@ public class CommunityController {
         CommunityJoinRequest request = joinRequestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Join request not found"));
 
-        if (!request.getCommunity().getId().equals(admin.getCommunity().getId())) {
-            return ResponseEntity.status(403)
-                    .body("You cannot approve requests for another community.");
+        if (admin.getRole() != Role.SUPER_ADMIN) {
+            if (admin.getCommunity() == null || !request.getCommunity().getId().equals(admin.getCommunity().getId())) {
+                return ResponseEntity.status(403)
+                        .body("You cannot approve requests for another community.");
+            }
         }
 
         request.setStatus(JoinRequestStatus.APPROVED);
@@ -155,11 +170,12 @@ public class CommunityController {
         userRepository.save(resident);
         joinRequestRepository.save(request);
 
+        auditLogService.log(authentication.getName(), "APPROVE_RESIDENT", "Approved resident: " + resident.getEmail() + " for flat: " + resident.getFlatNumber() + " in community: " + request.getCommunity().getName());
         return ResponseEntity.ok("Resident approved successfully.");
     }
 
     @PostMapping("/join-requests/{requestId}/reject")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<?> rejectJoinRequest(
             @PathVariable Long requestId,
             Authentication authentication
@@ -171,9 +187,11 @@ public class CommunityController {
         CommunityJoinRequest request = joinRequestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Join request not found"));
 
-        if (!request.getCommunity().getId().equals(admin.getCommunity().getId())) {
-            return ResponseEntity.status(403)
-                    .body("You cannot reject requests for another community.");
+        if (admin.getRole() != Role.SUPER_ADMIN) {
+            if (admin.getCommunity() == null || !request.getCommunity().getId().equals(admin.getCommunity().getId())) {
+                return ResponseEntity.status(403)
+                        .body("You cannot reject requests for another community.");
+            }
         }
 
         request.setStatus(JoinRequestStatus.REJECTED);
@@ -181,6 +199,7 @@ public class CommunityController {
 
         joinRequestRepository.save(request);
 
+        auditLogService.log(authentication.getName(), "REJECT_RESIDENT", "Rejected resident: " + request.getUser().getEmail() + " in community: " + request.getCommunity().getName());
         return ResponseEntity.ok("Resident rejected successfully.");
     }
 }

@@ -25,7 +25,7 @@ public class DashboardController {
     }
 
     @GetMapping("/admin")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Map<String, Object>> getCommunityAdminStats(Authentication authentication) {
         return ResponseEntity.ok(dashboardService.getCommunityAdminStats(authentication.getName()));
     }

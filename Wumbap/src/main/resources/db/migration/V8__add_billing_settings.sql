@@ -1,0 +1,3 @@
+ALTER TABLE communities ADD COLUMN minimum_monthly_charge NUMERIC(12,2) NOT NULL DEFAULT 0.00;
+ALTER TABLE communities ADD COLUMN fixed_service_charge NUMERIC(12,2) NOT NULL DEFAULT 0.00;
+ALTER TABLE communities ADD COLUMN due_date_days INTEGER NOT NULL DEFAULT 15;

@@ -1,0 +1,2 @@
+ALTER TABLE communities 
+ADD COLUMN IF NOT EXISTS primary_admin_id BIGINT REFERENCES users(id) ON DELETE SET NULL;

@@ -15,6 +15,11 @@ public interface CommunityJoinRequestRepository extends JpaRepository<CommunityJ
     List<CommunityJoinRequest> findByUserId(Long userId);
 
     /**
+     * All requests filtered by status.
+     */
+    List<CommunityJoinRequest> findByStatus(JoinRequestStatus status);
+
+    /**
      * All requests for a community.
      */
     List<CommunityJoinRequest> findByCommunityId(Long communityId);
