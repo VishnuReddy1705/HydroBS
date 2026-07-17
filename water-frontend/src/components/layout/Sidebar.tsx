@@ -1,9 +1,9 @@
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom"
 import {
   LayoutDashboard, Building2, Users, Droplet, Gauge, Receipt, FileText,
   ShoppingCart, FileSpreadsheet, Bell, BarChart3, UserCircle, LogOut,
   Settings, History, CreditCard, Lightbulb, Calendar, type LucideIcon,
-  TrendingUp, Layers
+  TrendingUp, Layers, Volume2, Activity
 } from "lucide-react"
 import { clearSession } from "@/lib/auth"
 import { motion } from "framer-motion"
@@ -20,6 +20,9 @@ const NAV_ITEMS: Record<"SUPER_ADMIN" | "ADMIN" | "RESIDENT", NavItem[]> = {
     { label: "Users", icon: Users },
     { label: "Reports", icon: BarChart3 },
     { label: "Visualizations", icon: TrendingUp },
+    { label: "Announcements", icon: Volume2 },
+    { label: "Audit Logs", icon: History },
+    { label: "System Health", icon: Activity },
     { label: "Settings", icon: Settings },
   ],
   ADMIN: [
@@ -34,6 +37,8 @@ const NAV_ITEMS: Record<"SUPER_ADMIN" | "ADMIN" | "RESIDENT", NavItem[]> = {
     { label: "Invoices", icon: FileSpreadsheet },
     { label: "Calendar", icon: Calendar },
     { label: "Alerts", icon: Bell },
+    { label: "Announcements", icon: Volume2 },
+    { label: "Audit Logs", icon: History },
     { label: "Reports", icon: BarChart3 },
     { label: "Visualizations", icon: TrendingUp },
     { label: "Profile", icon: UserCircle },
@@ -46,6 +51,7 @@ const NAV_ITEMS: Record<"SUPER_ADMIN" | "ADMIN" | "RESIDENT", NavItem[]> = {
     { label: "My Invoices", icon: FileText },
     { label: "Calendar", icon: Calendar },
     { label: "Notifications", icon: Bell },
+    { label: "Announcements", icon: Volume2 },
     { label: "Water Tips", icon: Lightbulb },
     { label: "Visualizations", icon: TrendingUp },
     { label: "Profile", icon: UserCircle },
@@ -59,9 +65,16 @@ interface SidebarProps {
 export default function Sidebar({ role }: SidebarProps) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const items = NAV_ITEMS[role]
   
-  const currentTab = searchParams.get("tab") || "dashboard"
+  let currentTab = searchParams.get("tab") || "dashboard"
+  
+  if (location.pathname.includes("/residents/") || location.pathname.includes("/residents-detail")) {
+    currentTab = role === "SUPER_ADMIN" ? "users" : "residents"
+  } else if (location.pathname.includes("/billing/") && !location.pathname.endsWith("/billing")) {
+    currentTab = role === "RESIDENT" ? "my-bills" : "billing"
+  }
   
   const getTabKey = (label: string) => {
     return label.toLowerCase().replace(" ", "-")
@@ -69,64 +82,14 @@ export default function Sidebar({ role }: SidebarProps) {
 
   const handleItemClick = (label: string) => {
     const tabKey = getTabKey(label)
-    if (tabKey === "profile" && role === "RESIDENT") {
-      navigate("/resident/profile")
-      return
-    }
-
-    if (role === "ADMIN" || role === "SUPER_ADMIN") {
-      if (tabKey === "billing-cycles") {
-        navigate("/admin/billing-cycles")
-        return
-      }
-      if (tabKey === "water-purchase") {
-        navigate("/admin/bulk-purchases")
-        return
-      }
-      if (tabKey === "meter-readings") {
-        navigate("/admin/readings")
-        return
-      }
-      if (tabKey === "water-usage") {
-        navigate("/admin/meters")
-        return
-      }
-      if (tabKey === "visualizations") {
-        navigate("/admin/water-analytics")
-        return
-      }
-      if (tabKey === "billing") {
-        navigate("/admin/billing")
-        return
-      }
-      if (tabKey === "tariff-plans") {
-        navigate("/admin/billing-settings")
-        return
-      }
-      if (tabKey === "invoices") {
-        navigate("/admin/billing")
-        return
-      }
-      if (tabKey === "reports") {
-        navigate(role === "SUPER_ADMIN" ? "/super-admin/billing-dashboard" : "/admin/billing-dashboard")
-        return
-      }
-    }
     
-    // Redirect back to dashboard if navigating other tabs
     const targetPath = role === "SUPER_ADMIN" 
       ? "/super-admin/dashboard" 
       : role === "ADMIN" 
       ? "/admin/dashboard" 
       : "/resident/dashboard"
 
-    if (tabKey === "dashboard") {
-      setSearchParams({})
-      navigate(targetPath)
-    } else {
-      setSearchParams({ tab: tabKey })
-      navigate(`${targetPath}?tab=${tabKey}`)
-    }
+    navigate(`${targetPath}?tab=${tabKey}`)
   }
 
   return (

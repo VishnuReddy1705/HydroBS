@@ -1,6 +1,6 @@
 import { Search, Bell, LogOut, Check, MailOpen, AlertTriangle, FileText, CheckCircle2, RefreshCw, Sun, Moon } from "lucide-react";
 import { getName, clearSession } from "@/lib/auth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import api from "@/api";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,6 +23,7 @@ interface NotificationItem {
 
 export default function TopNavbar({ title, subtitle, onRefresh, isRefreshing }: TopNavbarProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [profile, setProfile] = useState<{ fullName: string; role: string; flatNumber?: string } | null>(null);
   
   const [theme, setTheme] = useState<"light" | "dark">(
@@ -169,9 +170,24 @@ export default function TopNavbar({ title, subtitle, onRefresh, isRefreshing }: 
   return (
     <header className="h-20 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/70 dark:bg-[#08121e]/70 backdrop-blur-md px-8 flex items-center justify-between sticky top-0 z-40 text-slate-800 dark:text-slate-100 shadow-sm select-none">
       <div className="flex flex-col text-left">
+        {/* Dynamic Breadcrumbs */}
+        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-0.5">
+          {location.pathname.split("/").filter(Boolean).map((seg, idx, arr) => {
+            const isLast = idx === arr.length - 1;
+            const formattedSeg = seg.replace("-", " ").toUpperCase();
+            if (seg === "dashboard" && idx === 1) return null;
+            return (
+              <div key={seg} className="flex items-center gap-1">
+                {idx > 0 && <span className="text-slate-300 dark:text-slate-700">/</span>}
+                <span className={isLast ? "text-[#00B4D8] font-extrabold" : ""}>{formattedSeg}</span>
+              </div>
+            );
+          })}
+        </div>
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-extrabold tracking-tight text-[#0F4C81] dark:text-[#00B4D8]">{title}</h1>
-          {onRefresh && (
+          {/* Hidden as requested - refresh buttons are now integrated within navigated panels */}
+          {false && onRefresh && (
             <button
               onClick={() => {
                 fetchProfile();

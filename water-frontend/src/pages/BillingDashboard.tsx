@@ -66,31 +66,34 @@ export default function BillingDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#090d16] p-6 text-white md:p-10">
-      <div className="mx-auto max-w-7xl">
+    <div className="space-y-6 text-slate-800 dark:text-slate-100 select-none">
+      
+      {/* Header */}
+      <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center border-b border-slate-100 dark:border-slate-800 pb-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#0F4C81] dark:text-[#00B4D8] flex items-center gap-3">
+            <BarChart2 className="h-8 w-8 text-[#0F4C81] dark:text-[#00B4D8]" />
+            {isSuperAdmin ? 'Platform Billing Intelligence' : 'Utility Billing Dashboard'}
+          </h1>
+          <p className="mt-2 text-slate-500 dark:text-slate-400 text-sm">
+            {isSuperAdmin 
+              ? 'Consolidated view of revenue collections, community billing comparisons, and forecast trends.'
+              : 'Track collections rate, review aging outstanding balances, and check top defaulting residents.'
+            }
+          </p>
+        </div>
         
-        {/* Header */}
-        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent flex items-center gap-3">
-              <BarChart2 className="h-8 w-8 text-blue-500" />
-              {isSuperAdmin ? 'Platform Billing Intelligence' : 'Utility Billing Dashboard'}
-            </h1>
-            <p className="mt-2 text-slate-400 text-sm">
-              {isSuperAdmin 
-                ? 'Consolidated view of revenue collections, community billing comparisons, and forecast trends.'
-                : 'Track collections rate, review aging outstanding balances, and check top defaulting residents.'
-              }
-            </p>
-          </div>
-
+        <div className="flex flex-wrap gap-3">
           <button
-            onClick={fetchAnalytics}
-            className="flex items-center gap-2 rounded-lg border border-slate-700 bg-[#0e1626] px-4 py-2 text-sm font-semibold hover:bg-slate-800 transition"
+            onClick={fetchData}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-[#0F4C81] hover:text-[#00B4D8] bg-slate-50 border border-slate-200/50 rounded-xl hover:bg-slate-100/80 transition-all cursor-pointer shadow-xs"
           >
-            <RefreshCw className="h-4 w-4" /> Refresh Data
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>Refresh</span>
           </button>
         </div>
+      </div>
+
 
         {/* Super Admin Metric Cards */}
         {isSuperAdmin ? (
@@ -366,8 +369,6 @@ export default function BillingDashboard() {
             </div>
           </div>
         )}
-
       </div>
-    </div>
   );
 }

@@ -33,6 +33,14 @@ public class ReportController {
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer quarter,
             @RequestParam(required = false) Long communityId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String building,
+            @RequestParam(required = false) Long residentId,
+            @RequestParam(required = false) Long billingCycleId,
+            @RequestParam(required = false) String paymentStatus,
+            @RequestParam(required = false) java.math.BigDecimal minUsage,
+            @RequestParam(required = false) java.math.BigDecimal maxUsage,
             Authentication auth
     ) {
         User user = userRepository.findByEmail(auth.getName())
@@ -54,7 +62,15 @@ public class ReportController {
                 targetYear,
                 month,
                 quarter,
-                commId
+                commId,
+                startDate,
+                endDate,
+                building,
+                residentId,
+                billingCycleId,
+                paymentStatus,
+                minUsage,
+                maxUsage
         );
         return ResponseEntity.ok(data);
     }
@@ -69,6 +85,14 @@ public class ReportController {
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer quarter,
             @RequestParam(required = false) Long communityId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String building,
+            @RequestParam(required = false) Long residentId,
+            @RequestParam(required = false) Long billingCycleId,
+            @RequestParam(required = false) String paymentStatus,
+            @RequestParam(required = false) java.math.BigDecimal minUsage,
+            @RequestParam(required = false) java.math.BigDecimal maxUsage,
             Authentication auth
     ) {
         User user = userRepository.findByEmail(auth.getName())
@@ -91,7 +115,15 @@ public class ReportController {
                     targetYear,
                     month,
                     quarter,
-                    commId
+                    commId,
+                    startDate,
+                    endDate,
+                    building,
+                    residentId,
+                    billingCycleId,
+                    paymentStatus,
+                    minUsage,
+                    maxUsage
             );
 
             byte[] fileBytes;

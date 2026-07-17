@@ -182,36 +182,42 @@ export default function BillManagementPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#090d16] p-6 text-white md:p-10">
-      <div className="mx-auto max-w-7xl">
-        
-        {/* Header */}
-        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent flex items-center gap-3">
-              <FileText className="h-8 w-8 text-blue-500" />
-              Bill Management
-            </h1>
-            <p className="mt-2 text-slate-400">
-              Generate utility bills, revision invoices, manage statuses, and view audit reports.
-            </p>
-          </div>
-          
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => navigate('/admin/billing-settings')}
-              className="flex items-center gap-2 rounded-lg border border-slate-700 bg-[#0e1626] px-4 py-2 text-sm font-semibold hover:bg-slate-800 transition"
-            >
-              <Settings className="h-4 w-4" /> Pricing Config
-            </button>
-            <button
-              onClick={() => setShowGenModal(true)}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-700 transition"
-            >
-              <Plus className="h-4 w-4" /> Run Billing Cycle
-            </button>
-          </div>
+    <div className="space-y-6 text-slate-800 dark:text-slate-100 select-none">
+      
+      {/* Header */}
+      <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center border-b border-slate-100 dark:border-slate-800 pb-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#0F4C81] dark:text-[#00B4D8] flex items-center gap-3">
+            <FileText className="h-8 w-8 text-[#0F4C81] dark:text-[#00B4D8]" />
+            Bill Management
+          </h1>
+          <p className="mt-2 text-slate-500 dark:text-slate-400">
+            Generate utility bills, revision invoices, manage statuses, and view audit reports.
+          </p>
         </div>
+        
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={fetchBills}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-[#0F4C81] hover:text-[#00B4D8] bg-slate-50 border border-slate-200/50 rounded-xl hover:bg-slate-100/80 transition-all cursor-pointer shadow-xs"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>Refresh</span>
+          </button>
+          <button
+            onClick={() => navigate('/admin/billing-settings')}
+            className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm font-semibold hover:bg-slate-100 transition"
+          >
+            <Settings className="h-4 w-4" /> Pricing Config
+          </button>
+          <button
+            onClick={() => setShowGenModal(true)}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-700 text-white transition"
+          >
+            <Plus className="h-4 w-4" /> Run Billing Cycle
+          </button>
+        </div>
+      </div>
 
         {/* Filters Panel */}
         <div className="mb-6 rounded-xl border border-slate-800 bg-[#0e1626]/80 p-4 backdrop-blur-md">
@@ -609,8 +615,6 @@ export default function BillManagementPage() {
             </form>
           </div>
         )}
-
       </div>
-    </div>
   );
 }

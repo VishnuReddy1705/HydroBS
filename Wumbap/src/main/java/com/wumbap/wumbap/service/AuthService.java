@@ -29,6 +29,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final RefreshTokenService refreshTokenService;
+    private final AuditLogService auditLogService;
 
     public AuthResponse register(RegisterResidentRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
@@ -46,6 +47,7 @@ public class AuthService {
                 .build();
 
         userRepository.save(user);
+        auditLogService.log(user.getEmail(), "RESIDENT_REGISTERED", "Resident user self-registered");
 
         // Simulate sending verification email
         System.out.println("Verification Email Link: http://localhost:5173/verify-email?token=" + user.getVerificationToken());
@@ -80,6 +82,10 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+        auditLogService.log(user.getEmail(), "USER_LOGIN", "User logged in successfully");
+
         org.springframework.security.core.userdetails.User userDetails =
                 new org.springframework.security.core.userdetails.User(
                         user.getEmail(),
@@ -110,6 +116,7 @@ public class AuthService {
             user.setResetPasswordToken(UUID.randomUUID().toString());
             user.setResetPasswordTokenExpiry(LocalDateTime.now().plusHours(1));
             userRepository.save(user);
+            auditLogService.log(email, "FORGOT_PASSWORD_REQUESTED", "Password reset token generated for user");
             
             // Simulate sending reset email
             System.out.println("Reset Password Link: http://localhost:5173/reset-password?token=" + user.getResetPasswordToken());
@@ -130,5 +137,6 @@ public class AuthService {
         user.setResetPasswordToken(null);
         user.setResetPasswordTokenExpiry(null);
         userRepository.save(user);
+        auditLogService.log(user.getEmail(), "PASSWORD_CHANGED", "User successfully reset their password via token");
     }
 }

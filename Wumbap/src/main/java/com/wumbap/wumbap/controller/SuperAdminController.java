@@ -207,6 +207,11 @@ public class SuperAdminController {
 
     // --- Users CRUD ---
 
+    @GetMapping("/users")
+    public ResponseEntity<?> getAllUsers() {
+        return ResponseEntity.ok(userRepository.findAll());
+    }
+
     @PostMapping("/users")
     public ResponseEntity<?> createUser(@RequestBody Map<String, Object> req) {
         String email = (String) req.get("email");

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getToken, getRefreshToken, updateAccessToken, clearSession } from '@/lib/auth';
+import { toast } from 'sonner';
 
 const api = axios.create({
   baseURL: 'http://localhost:8080', // Point to Spring Boot
@@ -13,7 +14,9 @@ api.interceptors.request.use(
   (config) => {
     const token = getToken();
     if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+      if (config.headers) {
+        config.headers.set('Authorization', `Bearer ${token}`);
+      }
     }
     return config;
   },
@@ -41,13 +44,21 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Handle 403 Forbidden - do not redirect to login, show access denied toast
+    if (error.response?.status === 403) {
+      toast.error(error.response.data?.message || "Access Denied: You do not have permission to perform this action.");
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
         })
           .then((token) => {
-            originalRequest.headers['Authorization'] = 'Bearer ' + token;
+            if (originalRequest.headers) {
+              originalRequest.headers.set('Authorization', 'Bearer ' + token);
+            }
             return api(originalRequest);
           })
           .catch((err) => {
@@ -71,7 +82,9 @@ api.interceptors.response.use(
           .then(({ data }) => {
             updateAccessToken(data.accessToken);
             api.defaults.headers.common['Authorization'] = 'Bearer ' + data.accessToken;
-            originalRequest.headers['Authorization'] = 'Bearer ' + data.accessToken;
+            if (originalRequest.headers) {
+              originalRequest.headers.set('Authorization', 'Bearer ' + data.accessToken);
+            }
             processQueue(null, data.accessToken);
             resolve(api(originalRequest));
           })

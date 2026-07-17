@@ -135,42 +135,42 @@ export interface BillRevisionPayload {
 export const billingService = {
   // Tariff Configurations
   getTariffs: async (communityId: number): Promise<Tariff[]> => {
-    const res = await api.get(`/communities/${communityId}/tariffs`);
+    const res = await api.get(`/api/communities/${communityId}/tariffs`);
     return res.data;
   },
 
   getActiveTariff: async (communityId: number): Promise<Tariff> => {
-    const res = await api.get(`/communities/${communityId}/tariffs/active`);
+    const res = await api.get(`/api/communities/${communityId}/tariffs/active`);
     return res.data;
   },
 
   createTariff: async (communityId: number, tariff: Partial<Tariff>): Promise<Tariff> => {
-    const res = await api.post(`/communities/${communityId}/tariffs`, tariff);
+    const res = await api.post(`/api/communities/${communityId}/tariffs`, tariff);
     return res.data;
   },
 
   updateTariff: async (communityId: number, tariffId: number, tariff: Partial<Tariff>): Promise<Tariff> => {
-    const res = await api.put(`/communities/${communityId}/tariffs/${tariffId}`, tariff);
+    const res = await api.put(`/api/communities/${communityId}/tariffs/${tariffId}`, tariff);
     return res.data;
   },
 
   deleteTariff: async (communityId: number, tariffId: number): Promise<void> => {
-    await api.delete(`/communities/${communityId}/tariffs/${tariffId}`);
+    await api.delete(`/api/communities/${communityId}/tariffs/${tariffId}`);
   },
 
   // Bill Actions
   generateBills: async (payload: BillGenerationPayload): Promise<Bill[]> => {
-    const res = await api.post("/billing/generate", payload);
+    const res = await api.post("/api/billing/generate", payload);
     return res.data;
   },
 
   reviseBill: async (billId: number, payload: BillRevisionPayload): Promise<Bill> => {
-    const res = await api.post(`/billing/${billId}/revise`, payload);
+    const res = await api.post(`/api/billing/${billId}/revise`, payload);
     return res.data;
   },
 
   getBillDetails: async (billId: number): Promise<Bill> => {
-    const res = await api.get(`/billing/${billId}`);
+    const res = await api.get(`/api/billing/${billId}`);
     return res.data;
   },
 
@@ -183,56 +183,56 @@ export const billingService = {
     page?: number;
     size?: number;
   }): Promise<{ content: Bill[]; totalElements: number; totalPages: number }> => {
-    const res = await api.get("/billing/search", { params });
+    const res = await api.get("/api/billing/search", { params });
     return res.data;
   },
 
   getAnalytics: async (communityId?: number): Promise<any> => {
-    const res = await api.get("/billing/analytics", { params: { communityId } });
+    const res = await api.get("/api/billing/analytics", { params: { communityId } });
     return res.data;
   },
 
   getSuperAdminAnalytics: async (): Promise<any> => {
-    const res = await api.get("/billing/super-admin/analytics");
+    const res = await api.get("/api/billing/super-admin/analytics");
     return res.data;
   },
 
   downloadPdfUrl: (billId: number): string => {
     const baseURL = api.defaults.baseURL || "";
-    return `${baseURL}/billing/${billId}/pdf`;
+    return `${baseURL}/api/billing/${billId}/pdf`;
   },
 
   triggerEmail: async (billId: number): Promise<void> => {
-    await api.post(`/billing/${billId}/email`);
+    await api.post(`/api/billing/${billId}/email`);
   },
 
   // Billing Cycle lifecycle actions
   getBillingCycles: async (communityId?: number): Promise<BillingCycle[]> => {
-    const res = await api.get("/billing-cycles", { params: { communityId } });
+    const res = await api.get("/api/billing-cycles", { params: { communityId } });
     return res.data;
   },
 
   createBillingCycle: async (cycle: Partial<BillingCycle>): Promise<BillingCycle> => {
-    const res = await api.post("/billing-cycles", cycle);
+    const res = await api.post("/api/billing-cycles", cycle);
     return res.data;
   },
 
   updateBillingCycle: async (id: number, cycle: Partial<BillingCycle>): Promise<BillingCycle> => {
-    const res = await api.put(`/billing-cycles/${id}`, cycle);
+    const res = await api.put(`/api/billing-cycles/${id}`, cycle);
     return res.data;
   },
 
   deleteBillingCycle: async (id: number): Promise<void> => {
-    await api.delete(`/billing-cycles/${id}`);
+    await api.delete(`/api/billing-cycles/${id}`);
   },
 
   transitionBillingCycle: async (id: number, status: string): Promise<BillingCycle> => {
-    const res = await api.post(`/billing-cycles/${id}/transition`, null, { params: { status } });
+    const res = await api.post(`/api/billing-cycles/${id}/transition`, null, { params: { status } });
     return res.data;
   },
 
   reopenBillingCycle: async (id: number): Promise<BillingCycle> => {
-    const res = await api.post(`/billing-cycles/${id}/reopen`);
+    const res = await api.post(`/api/billing-cycles/${id}/reopen`);
     return res.data;
   },
 
@@ -245,27 +245,27 @@ export const billingService = {
     page?: number;
     size?: number;
   }): Promise<{ content: BulkWaterPurchase[]; totalElements: number; totalPages: number }> => {
-    const res = await api.get("/bulk-purchases", { params });
+    const res = await api.get("/api/bulk-purchases", { params });
     return res.data;
   },
 
   createBulkWaterPurchase: async (purchase: Partial<BulkWaterPurchase>): Promise<BulkWaterPurchase> => {
-    const res = await api.post("/bulk-purchases", purchase);
+    const res = await api.post("/api/bulk-purchases", purchase);
     return res.data;
   },
 
   updateBulkWaterPurchase: async (id: number, purchase: Partial<BulkWaterPurchase>): Promise<BulkWaterPurchase> => {
-    const res = await api.put(`/bulk-purchases/${id}`, purchase);
+    const res = await api.put(`/api/bulk-purchases/${id}`, purchase);
     return res.data;
   },
 
   deleteBulkWaterPurchase: async (id: number): Promise<void> => {
-    await api.delete(`/bulk-purchases/${id}`);
+    await api.delete(`/api/bulk-purchases/${id}`);
   },
 
   exportBulkWaterPurchasesUrl: (communityId?: number, billingCycleId?: number): string => {
     const baseURL = api.defaults.baseURL || "";
-    let url = `${baseURL}/bulk-purchases/export`;
+    let url = `${baseURL}/api/bulk-purchases/export`;
     const params = [];
     if (communityId) params.push(`communityId=${communityId}`);
     if (billingCycleId) params.push(`billingCycleId=${billingCycleId}`);
@@ -277,7 +277,7 @@ export const billingService = {
 
   // Leak Detection API client actions
   getAnomalies: async (communityId?: number): Promise<any[]> => {
-    const res = await api.get("/water/anomalies", { params: { communityId } });
+    const res = await api.get("/api/water/anomalies", { params: { communityId } });
     return res.data;
   }
 };

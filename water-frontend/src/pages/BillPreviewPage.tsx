@@ -7,8 +7,9 @@ import {
 import { billingService, type Bill } from '../services/billingService';
 import { toast } from 'sonner';
 
-export default function BillPreviewPage() {
-  const { id } = useParams<{ id: string }>();
+export default function BillPreviewPage({ id: propId }: { id?: string }) {
+  const { id: paramId } = useParams<{ id: string }>();
+  const id = propId || paramId;
   const navigate = useNavigate();
   const [bill, setBill] = useState<Bill | null>(null);
   const [loading, setLoading] = useState(true);

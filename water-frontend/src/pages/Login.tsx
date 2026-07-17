@@ -74,207 +74,509 @@ export default function HydroBSLogin() {
     navigate('/register/resident');
   };
 
-  // Generate random bubbles for water background
-  const bubbles = Array.from({ length: 18 }, (_, i) => ({
-    id: i,
-    left: `${Math.random() * 100}%`,
-    size: Math.random() * 20 + 8,
-    delay: Math.random() * 8,
-    duration: Math.random() * 6 + 6,
-  }));
-
   return (
-    <div className="relative min-h-screen w-full bg-gradient-to-tr from-[#0b1b3d] via-[#0f2954] to-[#173e75] flex flex-col items-center justify-center p-4 antialiased overflow-hidden select-none">
-      
-      {/* Floating Bubbles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        {bubbles.map((b) => (
-          <div
-            key={b.id}
-            className="water-bubble"
-            style={{
-              left: b.left,
-              width: `${b.size}px`,
-              height: `${b.size}px`,
-              animation: `riseUp ${b.duration}s infinite linear`,
-              animationDelay: `${b.delay}s`,
-            }}
-          />
-        ))}
-      </div>
+    <div className="login-page-root">
+      {/* CSS Styles embedded for login page */}
+      <style>{`
+        .login-page-root {
+          min-height: 100vh;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 1.5rem;
+          overflow: hidden;
+          position: relative;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          background: linear-gradient(135deg, #0a1628 0%, #0d2847 35%, #143d6b 65%, #1a4f7a 100%);
+        }
 
-      {/* Overlapping Waves at bottom */}
-      <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-none z-0 pointer-events-none opacity-30">
-        <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className="relative block w-[200%] h-[140px] fill-[#00B4D8] animate-[waveFlow_25s_linear_infinite]">
-          <path d="M0,50 C300,90 600,30 900,80 C1200,120 1500,40 1800,60 L1800,120 L0,120 Z" />
-        </svg>
-        <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className="absolute bottom-0 left-0 block w-[200%] h-[110px] fill-[#0F4C81] animate-[waveFlow_15s_linear_infinite_reverse]">
-          <path d="M0,30 C300,70 600,10 900,60 C1200,100 1500,20 1800,40 L1800,120 L0,120 Z" />
-        </svg>
-      </div>
+        .login-page-root::before {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: radial-gradient(ellipse at 30% 20%, rgba(0, 180, 216, 0.06) 0%, transparent 50%),
+                      radial-gradient(ellipse at 70% 80%, rgba(15, 76, 129, 0.08) 0%, transparent 50%);
+          pointer-events: none;
+          z-index: 0;
+        }
 
-      {/* Main Container */}
-      <motion.div 
+        .login-brand-section {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          margin-bottom: 1.75rem;
+          z-index: 10;
+          position: relative;
+        }
+
+        .login-droplet-icon {
+          width: 56px;
+          height: 56px;
+          background: linear-gradient(135deg, #17c8d8 0%, #00b4d8 50%, #0f8cc3 100%);
+          border-radius: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 8px 32px rgba(0, 180, 216, 0.35),
+                      0 2px 8px rgba(0, 0, 0, 0.2);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .login-brand-title {
+          font-size: 2.25rem;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          color: #ffffff;
+          margin-top: 0.875rem;
+          line-height: 1;
+        }
+
+        .login-brand-subtitle {
+          font-size: 0.8125rem;
+          font-weight: 500;
+          color: rgba(148, 175, 205, 0.9);
+          margin-top: 0.375rem;
+          letter-spacing: 0.02em;
+        }
+
+        .login-card {
+          width: 100%;
+          max-width: 440px;
+          background: linear-gradient(180deg, 
+            rgba(220, 232, 245, 0.92) 0%, 
+            rgba(235, 242, 250, 0.95) 40%,
+            rgba(245, 249, 253, 0.97) 100%);
+          border-radius: 24px;
+          padding: 2rem 2.25rem 2rem;
+          box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25),
+                      0 8px 24px rgba(0, 0, 0, 0.15),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+          border: 1px solid rgba(255, 255, 255, 0.35);
+          position: relative;
+          z-index: 10;
+          backdrop-filter: blur(20px);
+        }
+
+        .login-card-title {
+          font-size: 1.5rem;
+          font-weight: 700;
+          color: #0d2847;
+          margin-bottom: 1.5rem;
+          letter-spacing: -0.01em;
+        }
+
+        .login-field-label {
+          display: block;
+          font-size: 0.625rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          color: rgba(100, 130, 160, 0.85);
+          margin-bottom: 0.375rem;
+          padding-left: 0.125rem;
+        }
+
+        .login-input-wrapper {
+          position: relative;
+          margin-bottom: 1rem;
+        }
+
+        .login-input-icon {
+          position: absolute;
+          left: 1rem;
+          top: 50%;
+          transform: translateY(-50%);
+          color: rgba(120, 150, 180, 0.6);
+          z-index: 2;
+        }
+
+        .login-input {
+          width: 100%;
+          background: linear-gradient(135deg, rgba(10, 22, 40, 0.88) 0%, rgba(13, 40, 71, 0.92) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 14px;
+          padding: 0.875rem 1rem 0.875rem 2.875rem;
+          color: #ffffff;
+          font-size: 0.875rem;
+          font-weight: 500;
+          outline: none;
+          transition: all 0.2s ease;
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15);
+        }
+
+        .login-input::placeholder {
+          color: rgba(148, 175, 205, 0.5);
+        }
+
+        .login-input:focus {
+          border-color: rgba(0, 180, 216, 0.5);
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15),
+                      0 0 0 3px rgba(0, 180, 216, 0.12);
+        }
+
+        .login-input-password {
+          padding-right: 3rem;
+        }
+
+        .login-eye-btn {
+          position: absolute;
+          right: 0.875rem;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: rgba(120, 150, 180, 0.6);
+          z-index: 2;
+          padding: 4px;
+          transition: color 0.2s;
+        }
+
+        .login-eye-btn:hover {
+          color: rgba(200, 220, 240, 0.9);
+        }
+
+        .login-row-between {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 1.25rem;
+        }
+
+        .login-remember-label {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.75rem;
+          font-weight: 500;
+          color: rgba(80, 110, 140, 0.85);
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .login-remember-label:hover {
+          color: #0d2847;
+        }
+
+        .login-remember-checkbox {
+          width: 15px;
+          height: 15px;
+          border-radius: 4px;
+          accent-color: #00b4d8;
+          cursor: pointer;
+        }
+
+        .login-forgot-link {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: #17c8d8;
+          text-decoration: none;
+          transition: color 0.2s;
+        }
+
+        .login-forgot-link:hover {
+          color: #0fa8c0;
+        }
+
+        .login-submit-btn {
+          width: 100%;
+          padding: 0.9375rem 1.5rem;
+          background: linear-gradient(135deg, #00b4d8 0%, #0f8cc3 50%, #0f6da0 100%);
+          border: none;
+          border-radius: 14px;
+          color: #ffffff;
+          font-size: 0.875rem;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          transition: all 0.25s ease;
+          box-shadow: 0 6px 20px rgba(0, 180, 216, 0.3),
+                      0 2px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .login-submit-btn:hover:not(:disabled) {
+          background: linear-gradient(135deg, #17c8d8 0%, #00b4d8 50%, #0f8cc3 100%);
+          box-shadow: 0 8px 28px rgba(0, 180, 216, 0.4),
+                      0 4px 12px rgba(0, 0, 0, 0.12);
+          transform: translateY(-1px);
+        }
+
+        .login-submit-btn:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .login-submit-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .login-spinner {
+          width: 16px;
+          height: 16px;
+          border: 2px solid #ffffff;
+          border-top-color: transparent;
+          border-radius: 50%;
+          animation: login-spin 0.8s linear infinite;
+        }
+
+        @keyframes login-spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .login-divider {
+          margin-top: 1.75rem;
+          padding-top: 1.25rem;
+          border-top: 1px solid rgba(180, 200, 220, 0.4);
+        }
+
+        .login-reg-label {
+          text-align: center;
+          font-size: 0.625rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.15em;
+          color: rgba(100, 130, 160, 0.7);
+          margin-bottom: 0.875rem;
+        }
+
+        .login-reg-row {
+          display: flex;
+          gap: 0.75rem;
+        }
+
+        .login-reg-btn {
+          flex: 1;
+          padding: 0.6875rem 0.75rem;
+          background: linear-gradient(135deg, rgba(0, 180, 216, 0.12) 0%, rgba(15, 76, 129, 0.12) 100%);
+          border: 1px solid rgba(0, 180, 216, 0.2);
+          border-radius: 12px;
+          color: #0d2847;
+          font-size: 0.6875rem;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.375rem;
+          transition: all 0.2s ease;
+        }
+
+        .login-reg-btn:hover {
+          background: linear-gradient(135deg, rgba(0, 180, 216, 0.2) 0%, rgba(15, 76, 129, 0.18) 100%);
+          border-color: rgba(0, 180, 216, 0.35);
+          transform: translateY(-1px);
+        }
+
+        .login-reg-btn:active {
+          transform: translateY(0);
+        }
+
+        .login-reg-btn svg {
+          color: #00b4d8;
+        }
+
+        .login-footer {
+          margin-top: 1.75rem;
+          text-align: center;
+          font-size: 0.6875rem;
+          font-weight: 500;
+          color: rgba(148, 175, 205, 0.5);
+          letter-spacing: 0.02em;
+          z-index: 10;
+          position: relative;
+        }
+
+        .login-alert {
+          padding: 0.75rem 1rem;
+          border-radius: 12px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-bottom: 1rem;
+        }
+
+        .login-alert-error {
+          background: rgba(220, 38, 38, 0.08);
+          border: 1px solid rgba(220, 38, 38, 0.2);
+          color: #b91c1c;
+        }
+
+        .login-alert-success {
+          background: rgba(16, 185, 129, 0.08);
+          border: 1px solid rgba(16, 185, 129, 0.2);
+          color: #047857;
+        }
+
+        @media (max-width: 480px) {
+          .login-card {
+            padding: 1.5rem 1.5rem;
+          }
+          .login-reg-row {
+            flex-direction: column;
+          }
+        }
+      `}</style>
+
+      {/* Brand Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+        className="login-brand-section"
+      >
+        <motion.div
+          whileHover={{ scale: 1.08, rotate: 8 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+          className="login-droplet-icon"
+        >
+          <Droplet className="w-7 h-7 text-white" style={{ fill: 'rgba(255,255,255,0.15)' }} />
+        </motion.div>
+        <h1 className="login-brand-title">HydroBS</h1>
+        <p className="login-brand-subtitle">Smart Water Management & Billing SaaS</p>
+      </motion.div>
+
+      {/* Login Card */}
+      <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="w-full max-w-[460px] z-10"
+        transition={{ duration: 0.55, ease: 'easeOut', delay: 0.1 }}
+        className="login-card"
       >
-        {/* Logo and Brand */}
-        <div className="flex flex-col items-center mb-8">
-          <motion.div 
-            whileHover={{ scale: 1.1, rotate: 10 }}
-            className="h-16 w-16 bg-gradient-to-br from-[#48CAE4] to-[#00B4D8] rounded-2xl flex items-center justify-center shadow-[0_8px_30px_rgb(0,180,216,0.3)] border border-[#ffffff]/20 cursor-pointer"
-          >
-            <Droplet className="w-8 h-8 text-white fill-white/10" />
-          </motion.div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-white mt-4 bg-clip-text bg-gradient-to-r from-white via-slate-100 to-[#48CAE4]">
-            HydroBS
-          </h1>
-          <p className="text-sm font-medium text-slate-300 mt-1">Smart Water Management & Billing SaaS</p>
-        </div>
+        <h2 className="login-card-title">Welcome Back</h2>
 
-        {/* Login Form Panel */}
-        <div className="glass-morphic bg-white/10 border border-white/20 rounded-[28px] p-8 md:p-10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative overflow-hidden backdrop-blur-2xl">
-          
-          <div className="absolute top-0 right-0 h-40 w-40 bg-[#00B4D8]/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-          
-          <h2 className="text-2xl font-bold text-white mb-6">Welcome Back</h2>
-
-          {/* Feedback alerts */}
-          <AnimatePresence>
-            {error && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mb-5 p-4 bg-rose-500/10 border border-rose-500/30 text-rose-200 rounded-2xl text-xs font-semibold flex items-center gap-2"
-              >
-                <span>⚠️ {error}</span>
-              </motion.div>
-            )}
-
-            {success && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mb-5 p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 rounded-2xl text-xs font-semibold flex items-center gap-2"
-              >
-                <span>✅ {success}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <form onSubmit={handleLoginSubmit} className="space-y-5">
-            {/* Email Field */}
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-300 tracking-wider uppercase pl-1">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="you@example.com"
-                  value={credentials.email}
-                  onChange={handleInputChange}
-                  className="w-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-2xl pl-12 pr-4 py-3.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8] focus:bg-[#0b1b3d]/50 transition-all font-medium"
-                  required
-                  disabled={loading}
-                />
-              </div>
-            </div>
-
-            {/* Password Field */}
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-300 tracking-wider uppercase pl-1">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  placeholder="••••••••"
-                  value={credentials.password}
-                  onChange={handleInputChange}
-                  className="w-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-2xl pl-12 pr-12 py-3.5 text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8] focus:bg-[#0b1b3d]/50 transition-all font-medium"
-                  required
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between text-xs pt-1">
-              <label className="flex items-center text-slate-300 cursor-pointer hover:text-white transition-colors select-none">
-                <input
-                  type="checkbox"
-                  name="rememberMe"
-                  checked={credentials.rememberMe}
-                  onChange={handleInputChange}
-                  className="mr-2 rounded border-white/20 bg-white/5 text-[#00B4D8] focus:ring-[#00B4D8] focus:ring-offset-[#0b1b3d] h-4 w-4"
-                />
-                Remember me
-              </label>
-              <a href="/forgot-password" className="font-bold text-[#48CAE4] hover:text-[#00B4D8] transition-colors">
-                Forgot password?
-              </a>
-            </div>
-
-            {/* Login Button */}
-            <motion.button
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] hover:from-[#48CAE4] hover:to-[#00B4D8] text-white font-bold py-4 rounded-2xl shadow-[0_8px_25px_rgba(0,180,216,0.35)] transition-all text-sm tracking-wide mt-6 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+        {/* Feedback Alerts */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="login-alert login-alert-error"
             >
-              {loading ? (
-                <>
-                  <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  Processing...
-                </>
-              ) : (
-                <>
-                  Log In
-                  <ChevronRight className="w-4 h-4" />
-                </>
-              )}
-            </motion.button>
-          </form>
+              ⚠️ {error}
+            </motion.div>
+          )}
+          {success && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="login-alert login-alert-success"
+            >
+              ✅ {success}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          {/* Quick Registration Portals */}
-          <div className="mt-8 pt-6 border-t border-white/10">
-            <p className="text-center text-xs font-semibold text-slate-400 mb-4 uppercase tracking-wider">Registration Hub</p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={handleCreateCommunity}
-                className="flex-1 bg-white/5 hover:bg-white/10 hover:border-[#00B4D8]/50 border border-white/10 text-white py-3.5 px-4 rounded-2xl text-xs font-bold tracking-wide transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Building2 className="w-3.5 h-3.5 text-[#00B4D8]" />
-                Create Community
-              </button>
-              <button
-                onClick={handleJoinCommunity}
-                className="flex-1 bg-white/5 hover:bg-white/10 hover:border-[#00B4D8]/50 border border-white/10 text-white py-3.5 px-4 rounded-2xl text-xs font-bold tracking-wide transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <UserPlus className="w-3.5 h-3.5 text-[#00B4D8]" />
-                Join Community
-              </button>
-            </div>
+        <form onSubmit={handleLoginSubmit}>
+          {/* Email */}
+          <label className="login-field-label">Email Address</label>
+          <div className="login-input-wrapper">
+            <Mail className="login-input-icon" style={{ width: 18, height: 18 }} />
+            <input
+              type="email"
+              name="email"
+              placeholder="you@example.com"
+              value={credentials.email}
+              onChange={handleInputChange}
+              className="login-input"
+              required
+              disabled={loading}
+            />
           </div>
 
+          {/* Password */}
+          <label className="login-field-label">Password</label>
+          <div className="login-input-wrapper">
+            <Lock className="login-input-icon" style={{ width: 18, height: 18 }} />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              name="password"
+              placeholder="••••••••"
+              value={credentials.password}
+              onChange={handleInputChange}
+              className="login-input login-input-password"
+              required
+              disabled={loading}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="login-eye-btn"
+            >
+              {showPassword ? <EyeOff style={{ width: 18, height: 18 }} /> : <Eye style={{ width: 18, height: 18 }} />}
+            </button>
+          </div>
+
+          {/* Remember Me & Forgot */}
+          <div className="login-row-between">
+            <label className="login-remember-label">
+              <input
+                type="checkbox"
+                name="rememberMe"
+                checked={credentials.rememberMe}
+                onChange={handleInputChange}
+                className="login-remember-checkbox"
+              />
+              Remember me
+            </label>
+            <a href="/forgot-password" className="login-forgot-link">
+              Forgot password?
+            </a>
+          </div>
+
+          {/* Login Button */}
+          <motion.button
+            whileHover={{ scale: 1.005 }}
+            whileTap={{ scale: 0.995 }}
+            type="submit"
+            disabled={loading}
+            className="login-submit-btn"
+          >
+            {loading ? (
+              <>
+                <span className="login-spinner" />
+                Processing...
+              </>
+            ) : (
+              <>
+                Log In
+                <ChevronRight style={{ width: 16, height: 16 }} />
+              </>
+            )}
+          </motion.button>
+        </form>
+
+        {/* Registration Hub */}
+        <div className="login-divider">
+          <p className="login-reg-label">Registration Hub</p>
+          <div className="login-reg-row">
+            <button onClick={handleCreateCommunity} className="login-reg-btn">
+              <Building2 style={{ width: 14, height: 14 }} />
+              Create Community
+            </button>
+            <button onClick={handleJoinCommunity} className="login-reg-btn">
+              <UserPlus style={{ width: 14, height: 14 }} />
+              Join Community
+            </button>
+          </div>
         </div>
       </motion.div>
-      
-      {/* Dynamic water-marks footer */}
-      <footer className="mt-8 text-center text-slate-400 text-xs font-medium tracking-wide z-10 opacity-70">
+
+      {/* Footer */}
+      <footer className="login-footer">
         <p>© 2026 HydroBS Smart Water Management Utilities.</p>
       </footer>
     </div>

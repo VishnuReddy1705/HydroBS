@@ -1,12 +1,15 @@
 package com.wumbap.wumbap.service;
 
 import com.lowagie.text.*;
+import com.lowagie.text.Font;
+import com.lowagie.text.Rectangle;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import com.wumbap.wumbap.entity.WaterBill;
 import org.springframework.stereotype.Service;
 
+import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -16,175 +19,273 @@ import java.time.format.DateTimeFormatter;
 public class PdfService {
 
     public byte[] generateWaterBillPdf(WaterBill bill) throws DocumentException, IOException {
-        Document document = new Document(PageSize.A4);
+        Document document = new Document(PageSize.A4, 36, 36, 36, 36);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         
         PdfWriter.getInstance(document, out);
         document.open();
 
-        // Title
-        Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, Font.BOLD);
-        Paragraph title = new Paragraph("HYDROBS WATER UTILITY INVOICE", titleFont);
-        title.setAlignment(Element.ALIGN_CENTER);
-        title.setSpacingAfter(20);
+        // Colors
+        Color primaryColor = new Color(15, 76, 129); // #0F4C81
+        Color secondaryColor = new Color(0, 180, 216); // #00B4D8
+        Color textMuted = new Color(100, 116, 139); // #64748B
+        Color borderLight = new Color(226, 232, 240); // #E2E8F0
+
+        // Title and Header block
+        Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 22, Font.BOLD, primaryColor);
+        Paragraph title = new Paragraph("INVOICE", titleFont);
+        title.setSpacingAfter(4);
         document.add(title);
 
-        // Metadata table (Invoice details)
+        Font brandFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Font.BOLD, secondaryColor);
+        Paragraph branding = new Paragraph("HydroBS Water Utility Platform", brandFont);
+        branding.setSpacingAfter(20);
+        document.add(branding);
+
+        // Header Divider line
+        PdfPTable headerDivider = new PdfPTable(1);
+        headerDivider.setWidthPercentage(100);
+        PdfPCell dividerCell = new PdfPCell();
+        dividerCell.setBorder(Rectangle.BOTTOM);
+        dividerCell.setBorderWidth(2f);
+        dividerCell.setBorderColor(secondaryColor);
+        dividerCell.setPadding(0);
+        headerDivider.addCell(dividerCell);
+        document.add(headerDivider);
+        document.add(new Paragraph(" "));
+
+        // Metadata grid
         PdfPTable metaTable = new PdfPTable(2);
         metaTable.setWidthPercentage(100);
-        metaTable.setSpacingAfter(15);
+        metaTable.setSpacingAfter(20);
         
         String invNo = bill.getInvoiceNumber() != null ? bill.getInvoiceNumber() : "INV-2026-" + bill.getId();
         String billNo = bill.getBillNumber() != null ? bill.getBillNumber() : "HB-2026-" + bill.getId();
         String tModel = bill.getTariffModel() != null ? bill.getTariffModel() : "PER_UNIT";
 
-        metaTable.addCell(getCell("Invoice No: " + invNo, Element.ALIGN_LEFT));
-        metaTable.addCell(getCell("Billing Month: " + bill.getBillingMonth().toString(), Element.ALIGN_RIGHT));
-        
-        metaTable.addCell(getCell("Bill Reference: " + billNo, Element.ALIGN_LEFT));
-        metaTable.addCell(getCell("Due Date: " + (bill.getDueDate() != null ? bill.getDueDate().toString() : "N/A"), Element.ALIGN_RIGHT));
-        
-        metaTable.addCell(getCell("Tariff Model: " + tModel, Element.ALIGN_LEFT));
-        metaTable.addCell(getCell("Community: " + bill.getCommunity().getName(), Element.ALIGN_RIGHT));
+        // Invoice Info (Left Column)
+        PdfPTable infoLeft = new PdfPTable(1);
+        infoLeft.addCell(getMetaCell("Invoice Number: " + invNo, Font.BOLD, primaryColor));
+        infoLeft.addCell(getMetaCell("Ref Number: " + billNo, Font.NORMAL, textMuted));
+        infoLeft.addCell(getMetaCell("Status: " + bill.getStatus(), Font.BOLD, "PAID".equalsIgnoreCase(bill.getStatus()) ? new Color(34, 197, 94) : new Color(239, 68, 68)));
+        PdfPCell leftContainer = new PdfPCell(infoLeft);
+        leftContainer.setBorder(Rectangle.NO_BORDER);
+        metaTable.addCell(leftContainer);
 
-        metaTable.addCell(getCell("Status: " + bill.getStatus(), Element.ALIGN_LEFT));
-        metaTable.addCell(getCell("Generated: " + bill.getGeneratedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")), Element.ALIGN_RIGHT));
-        
+        // Date Info (Right Column)
+        PdfPTable infoRight = new PdfPTable(1);
+        infoRight.addCell(getMetaCellRight("Billing Month: " + bill.getBillingMonth().toString(), Font.NORMAL, textMuted));
+        infoRight.addCell(getMetaCellRight("Due Date: " + (bill.getDueDate() != null ? bill.getDueDate().toString() : "N/A"), Font.BOLD, new Color(239, 68, 68)));
+        infoRight.addCell(getMetaCellRight("Community: " + bill.getCommunity().getName(), Font.NORMAL, textMuted));
+        PdfPCell rightContainer = new PdfPCell(infoRight);
+        rightContainer.setBorder(Rectangle.NO_BORDER);
+        metaTable.addCell(rightContainer);
+
         document.add(metaTable);
 
-        // Divider
-        document.add(new Paragraph("----------------------------------------------------------------------------------------------------------------------------------"));
+        // Billed To Section
+        Paragraph billedTo = new Paragraph("BILLED TO:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Font.BOLD, textMuted));
+        billedTo.setSpacingAfter(4);
+        document.add(billedTo);
 
-        // Resident Details
-        Paragraph residentHeading = new Paragraph("Billed To:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Font.BOLD));
-        residentHeading.setSpacingBefore(10);
-        residentHeading.setSpacingAfter(5);
-        document.add(residentHeading);
+        Font nameFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Font.BOLD, primaryColor);
+        Paragraph residentName = new Paragraph(bill.getResident().getFullName(), nameFont);
+        document.add(residentName);
 
-        document.add(new Paragraph("Resident Name: " + bill.getResident().getFullName()));
-        document.add(new Paragraph("Email: " + bill.getResident().getEmail()));
-        
-        String address = "Flat: " + (bill.getResident().getFlatNumber() != null ? bill.getResident().getFlatNumber() : "N/A") +
-                " | Building: " + (bill.getResident().getBuilding() != null ? bill.getResident().getBuilding() : "N/A") +
-                " | Block: " + (bill.getResident().getBlock() != null ? bill.getResident().getBlock() : "N/A") +
-                " | Floor: " + (bill.getResident().getFloor() != null ? bill.getResident().getFloor() : "N/A");
-        document.add(new Paragraph(address));
+        String address = "Flat No. " + (bill.getResident().getFlatNumber() != null ? bill.getResident().getFlatNumber() : "N/A") +
+                ", Building " + (bill.getResident().getBuilding() != null ? bill.getResident().getBuilding() : "N/A") +
+                ", Block " + (bill.getResident().getBlock() != null ? bill.getResident().getBlock() : "N/A");
+        document.add(new Paragraph(address, FontFactory.getFont(FontFactory.HELVETICA, 10, textMuted)));
+        document.add(new Paragraph("Email: " + bill.getResident().getEmail(), FontFactory.getFont(FontFactory.HELVETICA, 10, textMuted)));
         document.add(new Paragraph(" "));
 
-        // Meter Readings Snapshot Header
-        Paragraph meterHeading = new Paragraph("Consumption Period Readings:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11, Font.BOLD));
-        meterHeading.setSpacingBefore(5);
-        meterHeading.setSpacingAfter(5);
-        document.add(meterHeading);
+        // Usage details panel
+        PdfPTable usageTable = new PdfPTable(3);
+        usageTable.setWidthPercentage(100);
+        usageTable.setSpacingBefore(10);
+        usageTable.setSpacingAfter(15);
+        usageTable.addCell(getTableHeaderCell("Previous Index"));
+        usageTable.addCell(getTableHeaderCell("Current Index"));
+        usageTable.addCell(getTableHeaderCell("Total Consumption"));
 
         BigDecimal prevRead = bill.getPreviousReading() != null ? bill.getPreviousReading() : BigDecimal.ZERO;
         BigDecimal currRead = bill.getCurrentReading() != null ? bill.getCurrentReading() : BigDecimal.ZERO;
-        document.add(new Paragraph("Previous Reading Index: " + prevRead.setScale(2, java.math.RoundingMode.HALF_UP) + " L"));
-        document.add(new Paragraph("Current Reading Index: " + currRead.setScale(2, java.math.RoundingMode.HALF_UP) + " L"));
-        document.add(new Paragraph("Total Water Consumed: " + bill.getTotalUsage().setScale(2, java.math.RoundingMode.HALF_UP) + " L"));
-        document.add(new Paragraph(" "));
 
-        // Billing Details Table
-        PdfPTable table = new PdfPTable(2);
-        table.setWidthPercentage(100);
-        table.setSpacingBefore(10);
-        table.setSpacingAfter(20);
+        usageTable.addCell(getTableCell(prevRead.setScale(0, java.math.RoundingMode.HALF_UP) + " Litres", Element.ALIGN_CENTER));
+        usageTable.addCell(getTableCell(currRead.setScale(0, java.math.RoundingMode.HALF_UP) + " Litres", Element.ALIGN_CENTER));
+        usageTable.addCell(getTableCell(bill.getTotalUsage().setScale(0, java.math.RoundingMode.HALF_UP) + " Litres", Element.ALIGN_CENTER));
+        document.add(usageTable);
 
-        // Table Headers
-        table.addCell(getBoldCell("Charge Description", Element.ALIGN_LEFT));
-        table.addCell(getBoldCell("Amount", Element.ALIGN_RIGHT));
+        // Line Items Table
+        PdfPTable lineItems = new PdfPTable(2);
+        lineItems.setWidthPercentage(100);
+        lineItems.setSpacingAfter(20);
 
-        // Consumption calculation rows
-        if ("FIXED".equalsIgnoreCase(tModel)) {
-            table.addCell(getCell("Fixed Consumption Tariff Price", Element.ALIGN_LEFT));
-            table.addCell(getCell("₹" + bill.getAmount().setScale(2, java.math.RoundingMode.HALF_UP), Element.ALIGN_RIGHT));
-        } else {
-            table.addCell(getCell("Water Usage Charges (Consumed " + bill.getTotalUsage().setScale(0, java.math.RoundingMode.HALF_UP) + " L)", Element.ALIGN_LEFT));
-            
-            BigDecimal baseUsageCharge = bill.getAmount()
-                    .subtract(bill.getTaxAmount())
-                    .subtract(bill.getLateFee())
-                    .subtract(bill.getPenalty())
-                    .subtract(bill.getServiceCharge())
-                    .subtract(bill.getMaintenanceCharge())
-                    .subtract(bill.getSewageCharge())
-                    .add(bill.getDiscountAmount())
-                    .add(bill.getSubsidyAmount());
-            if (baseUsageCharge.compareTo(BigDecimal.ZERO) < 0) baseUsageCharge = BigDecimal.ZERO;
-            
-            table.addCell(getCell("₹" + baseUsageCharge.setScale(2, java.math.RoundingMode.HALF_UP), Element.ALIGN_RIGHT));
-        }
+        lineItems.addCell(getTableHeaderCellLeft("Description"));
+        lineItems.addCell(getTableHeaderCellRight("Amount (INR)"));
 
-        // Additional charges
-        BigDecimal servCharge = bill.getServiceCharge() != null ? bill.getServiceCharge() : BigDecimal.ZERO;
-        table.addCell(getCell("Fixed Service Charge", Element.ALIGN_LEFT));
-        table.addCell(getCell("₹" + servCharge.setScale(2, java.math.RoundingMode.HALF_UP), Element.ALIGN_RIGHT));
+        // Base Usage Charge
+        BigDecimal baseUsageCharge = bill.getAmount()
+                .subtract(bill.getTaxAmount())
+                .subtract(bill.getLateFee())
+                .subtract(bill.getPenalty())
+                .subtract(bill.getServiceCharge())
+                .subtract(bill.getMaintenanceCharge())
+                .subtract(bill.getSewageCharge())
+                .add(bill.getDiscountAmount())
+                .add(bill.getSubsidyAmount());
+        if (baseUsageCharge.compareTo(BigDecimal.ZERO) < 0) baseUsageCharge = BigDecimal.ZERO;
 
-        BigDecimal maintCharge = bill.getMaintenanceCharge() != null ? bill.getMaintenanceCharge() : BigDecimal.ZERO;
-        table.addCell(getCell("Maintenance Charge", Element.ALIGN_LEFT));
-        table.addCell(getCell("₹" + maintCharge.setScale(2, java.math.RoundingMode.HALF_UP), Element.ALIGN_RIGHT));
+        lineItems.addCell(getLineItemCell("Water Consumption Charges (" + bill.getTotalUsage().setScale(0, java.math.RoundingMode.HALF_UP) + " L)"));
+        lineItems.addCell(getLineItemCellRight("₹" + baseUsageCharge.setScale(2, java.math.RoundingMode.HALF_UP)));
 
-        BigDecimal sewCharge = bill.getSewageCharge() != null ? bill.getSewageCharge() : BigDecimal.ZERO;
-        table.addCell(getCell("Sewage Utility Charge", Element.ALIGN_LEFT));
-        table.addCell(getCell("₹" + sewCharge.setScale(2, java.math.RoundingMode.HALF_UP), Element.ALIGN_RIGHT));
+        // Fixed service charge
+        BigDecimal serviceCharge = bill.getServiceCharge() != null ? bill.getServiceCharge() : BigDecimal.ZERO;
+        lineItems.addCell(getLineItemCell("Fixed Service Charge"));
+        lineItems.addCell(getLineItemCellRight("₹" + serviceCharge.setScale(2, java.math.RoundingMode.HALF_UP)));
 
-        // Taxes & Fees
-        table.addCell(getCell("Government Surcharge / Taxes", Element.ALIGN_LEFT));
-        table.addCell(getCell("₹" + bill.getTaxAmount().setScale(2, java.math.RoundingMode.HALF_UP), Element.ALIGN_RIGHT));
+        // Maintenance charge
+        BigDecimal maintenanceCharge = bill.getMaintenanceCharge() != null ? bill.getMaintenanceCharge() : BigDecimal.ZERO;
+        lineItems.addCell(getLineItemCell("Maintenance Charge"));
+        lineItems.addCell(getLineItemCellRight("₹" + maintenanceCharge.setScale(2, java.math.RoundingMode.HALF_UP)));
 
-        table.addCell(getCell("Late Fee Interest", Element.ALIGN_LEFT));
-        table.addCell(getCell("₹" + bill.getLateFee().setScale(2, java.math.RoundingMode.HALF_UP), Element.ALIGN_RIGHT));
+        // Sewage charge
+        BigDecimal sewageCharge = bill.getSewageCharge() != null ? bill.getSewageCharge() : BigDecimal.ZERO;
+        lineItems.addCell(getLineItemCell("Sewage Utility Charge"));
+        lineItems.addCell(getLineItemCellRight("₹" + sewageCharge.setScale(2, java.math.RoundingMode.HALF_UP)));
 
-        BigDecimal penCharge = bill.getPenalty() != null ? bill.getPenalty() : BigDecimal.ZERO;
-        table.addCell(getCell("Penalty Surcharge", Element.ALIGN_LEFT));
-        table.addCell(getCell("₹" + penCharge.setScale(2, java.math.RoundingMode.HALF_UP), Element.ALIGN_RIGHT));
+        // Taxes
+        lineItems.addCell(getLineItemCell("Government Surcharges & Taxes"));
+        lineItems.addCell(getLineItemCellRight("₹" + bill.getTaxAmount().setScale(2, java.math.RoundingMode.HALF_UP)));
+
+        // Interest
+        lineItems.addCell(getLineItemCell("Late Fee Interest Surcharge"));
+        lineItems.addCell(getLineItemCellRight("₹" + bill.getLateFee().setScale(2, java.math.RoundingMode.HALF_UP)));
 
         // Deductions
-        table.addCell(getCell("Promotional Discount Deductions", Element.ALIGN_LEFT));
-        table.addCell(getCell("- ₹" + bill.getDiscountAmount().setScale(2, java.math.RoundingMode.HALF_UP), Element.ALIGN_RIGHT));
+        lineItems.addCell(getLineItemCell("Promotional Discount Deductions"));
+        lineItems.addCell(getLineItemCellRight("- ₹" + bill.getDiscountAmount().setScale(2, java.math.RoundingMode.HALF_UP)));
 
-        BigDecimal subCharge = bill.getSubsidyAmount() != null ? bill.getSubsidyAmount() : BigDecimal.ZERO;
-        table.addCell(getCell("State Water Subsidy Benefit", Element.ALIGN_LEFT));
-        table.addCell(getCell("- ₹" + subCharge.setScale(2, java.math.RoundingMode.HALF_UP), Element.ALIGN_RIGHT));
+        // Grand Total row
+        lineItems.addCell(getBoldLineItemCell("Total Invoice Amount Due"));
+        lineItems.addCell(getBoldLineItemCellRight("₹" + bill.getAmount().setScale(2, java.math.RoundingMode.HALF_UP)));
 
-        // Total
-        table.addCell(getBoldCell("Total Invoice Amount Due", Element.ALIGN_LEFT));
-        table.addCell(getBoldCell("₹" + bill.getAmount().setScale(2, java.math.RoundingMode.HALF_UP), Element.ALIGN_RIGHT));
+        document.add(lineItems);
 
-        document.add(table);
+        // QR Code & Signoff bottom panel
+        PdfPTable footerGrid = new PdfPTable(2);
+        footerGrid.setWidthPercentage(100);
+        footerGrid.setSpacingBefore(10);
 
-        // Notes if present
-        if (bill.getNotes() != null && !bill.getNotes().trim().isEmpty()) {
-            Paragraph notesHeading = new Paragraph("Important Notes:", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Font.BOLD));
-            notesHeading.setSpacingBefore(5);
-            notesHeading.setSpacingAfter(2);
-            document.add(notesHeading);
-            document.add(new Paragraph(bill.getNotes(), FontFactory.getFont(FontFactory.HELVETICA, 9)));
-            document.add(new Paragraph(" "));
-        }
+        // Left box (Notes & Thank You)
+        PdfPTable notesBox = new PdfPTable(1);
+        notesBox.addCell(getMetaCell("Thank you for conserving water!", Font.BOLD, primaryColor));
+        notesBox.addCell(getMetaCell("Please pay on time to avoid disruption of service.", Font.NORMAL, textMuted));
+        PdfPCell notesContainer = new PdfPCell(notesBox);
+        notesContainer.setBorder(Rectangle.NO_BORDER);
+        footerGrid.addCell(notesContainer);
 
-        // Footer
-        Paragraph footer = new Paragraph("Thank you for conserving water! HydroBS Water Utility Solutions.", FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 10, Font.ITALIC));
-        footer.setAlignment(Element.ALIGN_CENTER);
-        document.add(footer);
+        // Right box (QR Code Mockup)
+        PdfPTable qrBox = new PdfPTable(1);
+        PdfPCell qrSquare = new PdfPCell(new Phrase("QR PLACEHOLDER\nSCAN TO PAY", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Font.BOLD, textMuted)));
+        qrSquare.setHorizontalAlignment(Element.ALIGN_CENTER);
+        qrSquare.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        qrSquare.setBackgroundColor(new Color(248, 250, 252));
+        qrSquare.setBorderWidth(1f);
+        qrSquare.setBorderColor(borderLight);
+        qrSquare.setFixedHeight(60f);
+        qrSquare.setPadding(10);
+        qrBox.addCell(qrSquare);
+        PdfPCell qrContainer = new PdfPCell(qrBox);
+        qrContainer.setBorder(Rectangle.NO_BORDER);
+        qrContainer.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        footerGrid.addCell(qrContainer);
+
+        document.add(footerGrid);
 
         document.close();
         return out.toByteArray();
     }
 
-    private PdfPCell getCell(String text, int alignment) {
-        PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA, 10)));
-        cell.setHorizontalAlignment(alignment);
+    private PdfPCell getMetaCell(String text, int style, Color color) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA, 10, style, color)));
         cell.setBorder(Rectangle.NO_BORDER);
-        cell.setPadding(5);
+        cell.setPadding(3);
         return cell;
     }
 
-    private PdfPCell getBoldCell(String text, int alignment) {
-        PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Font.BOLD)));
-        cell.setHorizontalAlignment(alignment);
-        cell.setBorder(Rectangle.BOTTOM);
+    private PdfPCell getMetaCellRight(String text, int style, Color color) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA, 10, style, color)));
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setPadding(3);
+        return cell;
+    }
+
+    private PdfPCell getTableHeaderCell(String text) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Font.BOLD, Color.WHITE)));
+        cell.setBackgroundColor(new Color(15, 76, 129));
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        cell.setPadding(6);
+        cell.setBorderColor(new Color(24, 46, 70));
+        return cell;
+    }
+
+    private PdfPCell getTableHeaderCellLeft(String text) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Font.BOLD, Color.WHITE)));
+        cell.setBackgroundColor(new Color(15, 76, 129));
+        cell.setHorizontalAlignment(Element.ALIGN_LEFT);
         cell.setPadding(8);
+        cell.setBorderColor(new Color(24, 46, 70));
+        return cell;
+    }
+
+    private PdfPCell getTableHeaderCellRight(String text) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Font.BOLD, Color.WHITE)));
+        cell.setBackgroundColor(new Color(15, 76, 129));
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        cell.setPadding(8);
+        cell.setBorderColor(new Color(24, 46, 70));
+        return cell;
+    }
+
+    private PdfPCell getTableCell(String text, int alignment) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA, 10)));
+        cell.setHorizontalAlignment(alignment);
+        cell.setPadding(6);
+        cell.setBorderColor(new Color(226, 232, 240));
+        return cell;
+    }
+
+    private PdfPCell getLineItemCell(String text) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA, 9)));
+        cell.setPadding(6);
+        cell.setBorderColor(new Color(226, 232, 240));
+        return cell;
+    }
+
+    private PdfPCell getLineItemCellRight(String text) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA, 9)));
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        cell.setPadding(6);
+        cell.setBorderColor(new Color(226, 232, 240));
+        return cell;
+    }
+
+    private PdfPCell getBoldLineItemCell(String text) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Font.BOLD)));
+        cell.setPadding(8);
+        cell.setBorderColor(new Color(15, 76, 129));
+        cell.setBackgroundColor(new Color(241, 245, 249));
+        return cell;
+    }
+
+    private PdfPCell getBoldLineItemCellRight(String text) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Font.BOLD, new Color(15, 76, 129))));
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        cell.setPadding(8);
+        cell.setBorderColor(new Color(15, 76, 129));
+        cell.setBackgroundColor(new Color(241, 245, 249));
         return cell;
     }
 }

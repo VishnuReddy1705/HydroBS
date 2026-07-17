@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.TreeMap;
 import java.util.Locale;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -48,6 +49,9 @@ public class ReportService {
     private final CommunityRepository communityRepository;
     private final WaterBillRepository waterBillRepository;
     private final MeterReadingRepository meterReadingRepository;
+    private final PaymentRepository paymentRepository;
+    private final AuditLogRepository auditLogRepository;
+    private final BillingCycleRepository billingCycleRepository;
 
     public Map<String, Object> generateReportData(
             String reportType,
@@ -57,35 +61,64 @@ public class ReportService {
             Integer quarter,
             Long communityId
     ) {
+        return generateReportData(reportType, frequency, year, month, quarter, communityId, null, null, null, null, null, null, null, null);
+    }
+
+    public Map<String, Object> generateReportData(
+            String reportType,
+            String frequency,
+            int year,
+            Integer month,
+            Integer quarter,
+            Long communityId,
+            LocalDate startDate,
+            LocalDate endDate,
+            String building,
+            Long residentId,
+            Long billingCycleId,
+            String paymentStatus,
+            BigDecimal minUsage,
+            BigDecimal maxUsage
+    ) {
         Map<String, Object> data = new HashMap<>();
         String title = reportType.toUpperCase() + " REPORT (" + frequency.toUpperCase() + " - " + year + ")";
         data.put("title", title);
 
-        // Fetch data pools
+        // Fetch primary pools
         List<WaterBill> bills = waterBillRepository.findAll().stream()
                 .filter(b -> b.getBillingMonth().getYear() == year)
                 .filter(b -> communityId == null || (b.getCommunity() != null && b.getCommunity().getId().equals(communityId)))
+                .filter(b -> billingCycleId == null || (b.getBillingCycle() != null && b.getBillingCycle().getId().equals(billingCycleId)))
+                .filter(b -> paymentStatus == null || paymentStatus.isEmpty() || paymentStatus.equalsIgnoreCase(b.getStatus()))
+                .filter(b -> residentId == null || (b.getResident() != null && b.getResident().getId().equals(residentId)))
+                .filter(b -> building == null || building.isEmpty() || (b.getResident() != null && building.equalsIgnoreCase(b.getResident().getBuilding())))
                 .toList();
 
         List<MeterReading> readings = meterReadingRepository.findAll().stream()
                 .filter(r -> r.getReadingDate().getYear() == year)
                 .filter(r -> communityId == null || (r.getCommunity() != null && r.getCommunity().getId().equals(communityId)))
+                .filter(r -> residentId == null || (r.getResident() != null && r.getResident().getId().equals(residentId)))
+                .filter(r -> building == null || building.isEmpty() || (r.getResident() != null && building.equalsIgnoreCase(r.getResident().getBuilding())))
+                .filter(r -> startDate == null || !r.getReadingDate().isBefore(startDate))
+                .filter(r -> endDate == null || !r.getReadingDate().isAfter(endDate))
+                .filter(r -> minUsage == null || (r.getUsageLitres() != null && r.getUsageLitres().compareTo(minUsage) >= 0))
+                .filter(r -> maxUsage == null || (r.getUsageLitres() != null && r.getUsageLitres().compareTo(maxUsage) <= 0))
                 .toList();
 
         List<User> residents = userRepository.findAll().stream()
                 .filter(u -> u.getRole() == Role.RESIDENT)
                 .filter(u -> communityId == null || (u.getCommunity() != null && u.getCommunity().getId().equals(communityId)))
+                .filter(u -> residentId == null || u.getId().equals(residentId))
+                .filter(u -> building == null || building.isEmpty() || building.equalsIgnoreCase(u.getBuilding()))
                 .toList();
 
-        // Apply Month/Quarter filter to bills and readings
+        // Apply Month/Quarter filter to bills
         if ("MONTHLY".equalsIgnoreCase(frequency) && month != null) {
             bills = bills.stream().filter(b -> b.getBillingMonth().getMonthValue() == month).toList();
-            readings = readings.stream().filter(r -> r.getReadingDate().getMonthValue() == month).toList();
         } else if ("QUARTERLY".equalsIgnoreCase(frequency) && quarter != null) {
             int startM = (quarter - 1) * 3 + 1;
             int endM = quarter * 3;
             bills = bills.stream().filter(b -> b.getBillingMonth().getMonthValue() >= startM && b.getBillingMonth().getMonthValue() <= endM).toList();
-            readings = readings.stream().filter(r -> r.getReadingDate().getMonthValue() >= startM && r.getReadingDate().getMonthValue() <= endM).toList();
         }
 
         List<String> headers = new ArrayList<>();
@@ -111,8 +144,8 @@ public class ReportService {
                 Map<String, Object> cell = cycleAgg.get(aggKey);
                 cell.put("cycle", cycleKey);
                 cell.put("commName", commName);
-                cell.put("usage", ((BigDecimal) cell.getOrDefault("usage", BigDecimal.ZERO)).add(b.getTotalUsage()));
-                cell.put("billed", ((BigDecimal) cell.getOrDefault("billed", BigDecimal.ZERO)).add(b.getAmount()));
+                cell.put("usage", ((BigDecimal) cell.getOrDefault("usage", BigDecimal.ZERO)).add(b.getTotalUsage() != null ? b.getTotalUsage() : BigDecimal.ZERO));
+                cell.put("billed", ((BigDecimal) cell.getOrDefault("billed", BigDecimal.ZERO)).add(b.getAmount() != null ? b.getAmount() : BigDecimal.ZERO));
                 
                 BigDecimal paid = "PAID".equalsIgnoreCase(b.getStatus()) ? b.getAmount() : BigDecimal.ZERO;
                 BigDecimal unpaid = "UNPAID".equalsIgnoreCase(b.getStatus()) ? b.getAmount() : BigDecimal.ZERO;
@@ -307,6 +340,80 @@ public class ReportService {
             summary.put("activeCustomers", activeCount);
             summary.put("deactivatedCustomers", (residents.size() - activeCount));
 
+        } else if ("AUDIT".equalsIgnoreCase(reportType)) {
+            headers.addAll(List.of("Timestamp", "User Email", "Action Type", "IP Address", "Details"));
+            List<AuditLog> logs = auditLogRepository.findAll().stream()
+                    .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                    .filter(log -> residentId == null || (userRepository.findByEmail(log.getUserEmail()).isPresent() && userRepository.findByEmail(log.getUserEmail()).get().getId().equals(residentId)))
+                    .limit(200)
+                    .toList();
+
+            for (AuditLog l : logs) {
+                rows.add(List.of(
+                        l.getCreatedAt().toString(),
+                        l.getUserEmail(),
+                        l.getActionType(),
+                        l.getIpAddress(),
+                        l.getDetails()
+                ));
+            }
+            summary.put("totalAuditLogsLogged", (long) logs.size());
+
+        } else if ("PAYMENTS".equalsIgnoreCase(reportType)) {
+            headers.addAll(List.of("Payment Date", "Invoice Number", "Resident Name", "Flat Number", "Community Name", "Amount (₹)", "Method", "Status"));
+            List<Payment> payments = paymentRepository.findAll().stream()
+                    .filter(p -> p.getBill() != null && (communityId == null || (p.getBill().getCommunity() != null && p.getBill().getCommunity().getId().equals(communityId))))
+                    .toList();
+
+            BigDecimal totalPayments = BigDecimal.ZERO;
+            for (Payment p : payments) {
+                rows.add(List.of(
+                        p.getPaidAt().toString(),
+                        p.getBill().getInvoiceNumber(),
+                        p.getBill().getResident().getFullName(),
+                        p.getBill().getResident().getFlatNumber(),
+                        p.getBill().getCommunity().getName(),
+                        "₹" + p.getAmount().setScale(2, RoundingMode.HALF_UP),
+                        p.getPaymentMethod(),
+                        p.getStatus()
+                ));
+                totalPayments = totalPayments.add(p.getAmount());
+            }
+            summary.put("totalTransactionsCount", (long) payments.size());
+            summary.put("consolidatedSettlementValue", "₹" + totalPayments.setScale(2, RoundingMode.HALF_UP));
+
+        } else if ("BILLING".equalsIgnoreCase(reportType)) {
+            headers.addAll(List.of("Bill Number", "Invoice", "Month", "Resident", "Flat", "Usage (L)", "Net Amount (₹)", "Due Date", "Status"));
+            for (WaterBill b : bills) {
+                rows.add(List.of(
+                        b.getBillNumber() != null ? b.getBillNumber() : "N/A",
+                        b.getInvoiceNumber() != null ? b.getInvoiceNumber() : "N/A",
+                        b.getBillingMonth().toString(),
+                        b.getResident().getFullName(),
+                        b.getResident().getFlatNumber(),
+                        b.getTotalUsage().setScale(0, RoundingMode.HALF_UP) + " L",
+                        "₹" + b.getAmount().setScale(2, RoundingMode.HALF_UP),
+                        b.getDueDate().toString(),
+                        b.getStatus()
+                ));
+            }
+            summary.put("billsCountInFilter", (long) bills.size());
+
+        } else if ("METER".equalsIgnoreCase(reportType)) {
+            headers.addAll(List.of("Resident Name", "Flat", "Community", "Reading Date", "Current Value", "Usage (L)", "Anomaly State"));
+            for (MeterReading r : readings) {
+                rows.add(List.of(
+                        r.getResident().getFullName(),
+                        r.getResident().getFlatNumber(),
+                        r.getCommunity().getName(),
+                        r.getReadingDate().toString(),
+                        r.getCurrentReading().setScale(2, RoundingMode.HALF_UP),
+                        r.getUsageLitres().setScale(0, RoundingMode.HALF_UP) + " L",
+                        r.getIsAnomaly() ? "Anomaly Detected" : "Normal"
+                ));
+            }
+            summary.put("totalReadingsSummarized", (long) readings.size());
+
         } else { // COMMUNITY report
             headers.addAll(List.of("Community ID", "Community Name", "Residents Enrolled", "Total Consumption (L)", "Revenue Paid (₹)", "Outstanding (₹)", "Billing Settings (L/Rate)"));
 
@@ -318,17 +425,20 @@ public class ReportService {
 
                 BigDecimal usage = meterReadingRepository.findByCommunityId(c.getId()).stream()
                         .map(MeterReading::getUsageLitres)
+                        .filter(Objects::nonNull)
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 List<WaterBill> commBills = waterBillRepository.findByCommunityId(c.getId());
                 BigDecimal revPaid = commBills.stream()
                         .filter(b -> "PAID".equalsIgnoreCase(b.getStatus()))
                         .map(WaterBill::getAmount)
+                        .filter(Objects::nonNull)
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 BigDecimal revUnpaid = commBills.stream()
                         .filter(b -> "UNPAID".equalsIgnoreCase(b.getStatus()))
                         .map(WaterBill::getAmount)
+                        .filter(Objects::nonNull)
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 rows.add(List.of(

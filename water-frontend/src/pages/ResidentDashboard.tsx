@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "../components/DashboardLayout";
+import NotificationCenter from "./NotificationCenter";
+import AnnouncementCenter from "./AnnouncementCenter";
+import AnalyticsDashboard from "./AnalyticsDashboard";
 import { 
   Droplet, TrendingDown, Receipt, Info, Shield, Search, Loader2, 
   CheckCircle2, AlertTriangle, Building2, ExternalLink, FileText, HelpCircle, 
@@ -994,8 +997,83 @@ export default function ResidentDashboard() {
         </div>
       )}
 
-      {/* Visualizations Tab */}
       {currentTab === "visualizations" && (
+        <AnalyticsDashboard />
+      )}
+
+      {currentTab === "usage-history" && (
+        <AnalyticsDashboard />
+      )}
+
+      {currentTab === "my-invoices" && (
+        <div className="border border-slate-100 rounded-3xl bg-white p-6 space-y-6 shadow-sm text-[#1F2937] animate-fade-in">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-lg font-bold text-[#0F4C81]">Invoices Directory</h3>
+              <p className="text-xs text-slate-500">Overview of all generated consumption invoices</p>
+            </div>
+            <button onClick={() => setSearchParams({})} className="text-xs font-bold text-[#00B4D8] hover:underline cursor-pointer">Back to Dashboard</button>
+          </div>
+          <div className="border border-slate-100 rounded-2xl bg-white shadow-xs overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Invoices List</h4>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-100">
+                  <tr>
+                    <th className="px-5 py-3.5">Invoice ID</th>
+                    <th className="px-5 py-3.5">Billing Cycle</th>
+                    <th className="px-5 py-3.5">Total Flow (Litres)</th>
+                    <th className="px-5 py-3.5">Amount</th>
+                    <th className="px-5 py-3.5">Status</th>
+                    <th className="px-5 py-3.5 text-right">Download</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
+                  {billsList.map((bill: any) => (
+                    <tr key={bill.billNo} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-5 py-3.5 font-bold text-[#0F4C81]">{bill.billNo}</td>
+                      <td className="px-5 py-3.5 text-slate-500">{bill.month}</td>
+                      <td className="px-5 py-3.5">{bill.usage}</td>
+                      <td className="px-5 py-3.5 font-bold text-slate-800">₹{bill.amount}</td>
+                      <td className="px-5 py-3.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
+                          bill.status === "PAID" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-amber-50 text-amber-600 border-amber-100"
+                        }`}>
+                          {bill.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        <button 
+                          onClick={() => handleDownloadInvoicePdf(parseInt(bill.billNo.replace("INV-", "")))}
+                          className="px-2 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-[#00B4D8] font-bold tracking-wide transition-all inline-flex items-center gap-1 cursor-pointer text-[10px]"
+                        >
+                          <Download className="h-3 w-3" /> PDF
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {currentTab === "notifications" && (
+        <NotificationCenter />
+      )}
+
+      {currentTab === "alerts" && (
+        <NotificationCenter />
+      )}
+
+      {currentTab === "announcements" && (
+        <AnnouncementCenter />
+      )}
+
+      {false && (
         <motion.div 
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}

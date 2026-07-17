@@ -12,8 +12,9 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
-export default function ResidentDetails() {
-  const { id } = useParams<{ id: string }>();
+export default function ResidentDetails({ id: propId, isTab = false }: { id?: string, isTab?: boolean }) {
+  const { id: paramId } = useParams<{ id: string }>();
+  const id = propId || paramId;
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(true);
@@ -83,13 +84,8 @@ export default function ResidentDetails() {
 
   const role = (localStorage.getItem("hydrobs_role") || "ADMIN") as "SUPER_ADMIN" | "ADMIN" | "RESIDENT";
 
-  return (
-    <DashboardLayout 
-      role={role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN"}
-      title="Resident Profile" 
-      subtitle={`View administrative details for ${profile?.fullName || "Resident"}`}
-    >
-      <div className="space-y-6 text-slate-800 dark:text-slate-100">
+  const mainContent = (
+    <div className="space-y-6 text-slate-800 dark:text-slate-100">
         {/* Back Button */}
         <button 
           onClick={() => navigate(-1)} 
@@ -349,8 +345,20 @@ export default function ResidentDetails() {
             )}
           </div>
         </div>
-
       </div>
+    );
+
+  if (isTab) {
+    return mainContent;
+  }
+
+  return (
+    <DashboardLayout 
+      role={role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN"}
+      title="Resident Profile" 
+      subtitle={`View administrative details for ${profile?.fullName || "Resident"}`}
+    >
+      {mainContent}
     </DashboardLayout>
   );
 }

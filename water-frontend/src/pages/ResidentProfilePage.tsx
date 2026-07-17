@@ -10,7 +10,7 @@ import {
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function ResidentProfilePage() {
+export default function ResidentProfilePage({ isTab = false }: { isTab?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [family, setFamily] = useState<any[]>([]);
@@ -159,12 +159,8 @@ export default function ResidentProfilePage() {
     );
   }
 
-  return (
-    <DashboardLayout 
-      role="RESIDENT"
-      title="My Profile" 
-      subtitle="Manage your personal details, household members, and attachments"
-    >
+  const mainContent = (
+    <>
       <div className="space-y-6 text-slate-800 dark:text-slate-100 max-w-5xl mx-auto">
         
         {/* Profile Card Header */}
@@ -558,7 +554,20 @@ export default function ResidentProfilePage() {
           </div>
         )}
       </AnimatePresence>
+    </>
+  );
 
+  if (isTab) {
+    return mainContent;
+  }
+
+  return (
+    <DashboardLayout 
+      role="RESIDENT"
+      title="My Profile" 
+      subtitle="Manage your personal details, household members, and attachments"
+    >
+      {mainContent}
     </DashboardLayout>
   );
 }
