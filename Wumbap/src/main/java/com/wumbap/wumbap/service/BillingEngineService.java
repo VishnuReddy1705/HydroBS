@@ -302,14 +302,21 @@ public class BillingEngineService {
 
     @Transactional
     public WaterBill generateSingleResidentBill(User resident, Community community, LocalDate billingMonth, String generatedBy, String notes, boolean overwrite, BillingCycle cycle) {
-        Optional<WaterBill> existingBill = waterBillRepository.findByResidentIdAndBillingMonth(resident.getId(), billingMonth);
-        if (existingBill.isPresent()) {
-            waterBillRepository.delete(existingBill.get());
+        LocalDate normalizedMonth = billingMonth != null ? billingMonth.withDayOfMonth(1) : LocalDate.now().withDayOfMonth(1);
+        
+        // Remove any existing UNPAID bills for this resident for the same month to prevent duplicate bill entries
+        List<WaterBill> existingBills = waterBillRepository.findByResidentId(resident.getId()).stream()
+                .filter(b -> b.getBillingMonth() != null 
+                        && b.getBillingMonth().withDayOfMonth(1).equals(normalizedMonth)
+                        && !"PAID".equalsIgnoreCase(b.getStatus()))
+                .toList();
+        if (!existingBills.isEmpty()) {
+            waterBillRepository.deleteAll(existingBills);
             waterBillRepository.flush();
         }
 
-        LocalDate start = (cycle != null) ? cycle.getStartDate() : billingMonth.withDayOfMonth(1);
-        LocalDate end = (cycle != null) ? cycle.getEndDate() : billingMonth.withDayOfMonth(billingMonth.lengthOfMonth());
+        LocalDate start = (cycle != null) ? cycle.getStartDate() : normalizedMonth;
+        LocalDate end = (cycle != null) ? cycle.getEndDate() : normalizedMonth.withDayOfMonth(normalizedMonth.lengthOfMonth());
 
         // Get readings to calculate usage
         List<MeterReading> readings = meterReadingRepository.findByResidentIdOrderByReadingDateDesc(resident.getId()).stream()

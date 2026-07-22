@@ -140,6 +140,7 @@ export default function AdminDashboard() {
   const [readingDate, setReadingDate] = useState("");
   const [readingAmount, setReadingAmount] = useState("");
   const [submittingReading, setSubmittingReading] = useState(false);
+  const [meterReadingsList, setMeterReadingsList] = useState<any[]>([]);
 
   // Billing Settings
   const [billingSettings, setBillingSettings] = useState({
@@ -157,17 +158,20 @@ export default function AdminDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const [statsRes, requestsRes, billsRes, purchasesRes] = await Promise.all([
+      const [statsRes, requestsRes, billsRes, purchasesRes, readingsRes] = await Promise.all([
         api.get("/api/dashboard/admin"),
         api.get("/api/communities/join-requests/pending"),
         api.get("/api/water/bills").catch(() => ({ data: [] })),
-        api.get("/api/bulk-purchases").catch(() => ({ data: [] }))
+        api.get("/api/bulk-purchases").catch(() => ({ data: [] })),
+        api.get("/api/water/readings/search?size=50").catch(() => ({ data: [] }))
       ]);
       setStats(statsRes.data);
       setPendingRequests(requestsRes.data);
       setInvoicesList(billsRes.data || []);
       const purchasesData = purchasesRes.data?.content || purchasesRes.data || [];
       setBulkPurchasesList(purchasesData);
+      const readingsData = readingsRes.data?.content || readingsRes.data || [];
+      setMeterReadingsList(readingsData);
 
       // Sync billing settings from backend
       const s = statsRes.data;
@@ -520,12 +524,21 @@ export default function AdminDashboard() {
     if (!readingFlat || !readingDate || !readingAmount) return;
     setSubmittingReading(true);
     try {
-      await api.post("/api/water/readings/manual", {
+      const res = await api.post("/api/water/readings/manual", {
         flatNumber: readingFlat,
         readingDate: readingDate,
         reading: parseFloat(readingAmount)
       });
-      toast.success("Manual reading submitted successfully.");
+      const newReading = res.data?.reading || res.data || {
+        flatNumber: readingFlat,
+        readingDate: readingDate,
+        usageLitres: parseFloat(readingAmount),
+        currentReading: parseFloat(readingAmount),
+        source: "Manual Entry",
+        createdAt: new Date().toISOString()
+      };
+      setMeterReadingsList(prev => [newReading, ...prev]);
+      toast.success("Manual reading submitted & real-time telemetry updated!");
       setShowReadingModal(false);
       setReadingFlat("");
       setReadingDate("");
@@ -1326,39 +1339,89 @@ export default function AdminDashboard() {
           </div>
 
           {/* Recent Readings Table */}
-          <div className="border border-slate-100 rounded-3xl bg-white overflow-hidden shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h4 className="text-xs font-bold uppercase tracking-wide text-[#0F4C81]">Recent Readings</h4>
+          <div className="border border-slate-100 rounded-3xl bg-white overflow-hidden shadow-sm space-y-2">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+              <div>
+                <h4 className="text-sm font-bold text-[#0F4C81]">Recent Meter Readings</h4>
+                <p className="text-xs text-slate-500">Live readings history, timestamp posted, consumption delta, and source.</p>
+              </div>
+              <span className="px-2.5 py-1 rounded-full bg-cyan-50 border border-cyan-200 text-[#00B4D8] text-[10px] font-bold uppercase flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#00B4D8] animate-ping" /> Real-time Sync
+              </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-100">
                   <tr>
-                    <th className="px-6 py-3">Flat</th>
-                    <th className="px-6 py-3">Date</th>
-                    <th className="px-6 py-3">Reading (L)</th>
-                    <th className="px-6 py-3">Source</th>
+                    <th className="px-6 py-3">Flat & Resident</th>
+                    <th className="px-6 py-3">Reading Date & Time Posted</th>
+                    <th className="px-6 py-3">Meter Index (Prev → Curr)</th>
+                    <th className="px-6 py-3">Net Volume (L)</th>
+                    <th className="px-6 py-3">Ingestion Source</th>
+                    <th className="px-6 py-3">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
-                  {meterReadings.length > 0 ? (
-                    meterReadings.slice(0, 10).map((r: any, idx: number) => (
-                      <tr key={r.id || idx} className="hover:bg-slate-50/50">
-                        <td className="px-6 py-3 font-bold text-[#0F4C81]">{r.flatNumber || r.flat}</td>
-                        <td className="px-6 py-3">{r.date}</td>
-                        <td className="px-6 py-3">{r.reading || r.amount}</td>
-                        <td className="px-6 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
-                            r.source === "CSV" ? "bg-cyan-50 text-[#00B4D8]" : "bg-emerald-50 text-[#2ECC71]"
-                          }`}>
-                            {r.source || "Manual"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                  {(meterReadingsList.length > 0 ? meterReadingsList : meterReadings).length > 0 ? (
+                    (meterReadingsList.length > 0 ? meterReadingsList : meterReadings).map((r: any, idx: number) => {
+                      const flatStr = r.flatNumber || r.flat || "Flat -";
+                      const residentName = r.residentName || "Resident";
+                      const blockStr = r.building || r.block ? `(${r.building || r.block})` : "";
+                      const dateStr = r.readingDate || r.date || "Today";
+                      const timePosted = r.createdAt 
+                        ? new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+                        : "Live";
+                      const prevReading = r.previousReading != null ? r.previousReading : "-";
+                      const currReading = r.currentReading != null ? r.currentReading : (r.reading || r.amount || 0);
+                      const usageL = r.usageLitres != null ? r.usageLitres : (r.reading || r.amount || 0);
+                      
+                      const isCsv = r.source === "CSV" || (r.notes && r.notes.includes(".csv"));
+                      const sourceLabel = isCsv ? (r.notes || "Bulk CSV Upload") : (r.source || "Manual Entry");
+
+                      return (
+                        <tr key={r.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-3.5">
+                            <div className="font-bold text-[#0F4C81]">{flatStr} <span className="text-[10px] text-slate-400 font-normal">{blockStr}</span></div>
+                            <div className="text-[10px] text-slate-500 font-medium">{residentName}</div>
+                          </td>
+                          <td className="px-6 py-3.5">
+                            <div className="font-semibold text-slate-700">{dateStr}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">Posted: {timePosted}</div>
+                          </td>
+                          <td className="px-6 py-3.5 font-mono">
+                            <span className="text-slate-400">{prevReading} L</span>
+                            <span className="text-slate-300 mx-1.5">→</span>
+                            <span className="font-bold text-[#0F4C81]">{currReading} L</span>
+                          </td>
+                          <td className="px-6 py-3.5">
+                            <span className="font-extrabold text-[#00B4D8] font-mono text-sm">{usageL} L</span>
+                            <span className="text-[10px] text-slate-400 block font-normal">({(usageL / 1000).toFixed(2)} kL)</span>
+                          </td>
+                          <td className="px-6 py-3.5">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                              isCsv ? "bg-cyan-50 text-[#00B4D8] border border-cyan-200" : "bg-purple-50 text-purple-600 border border-purple-200"
+                            }`}>
+                              {isCsv ? "📄 CSV Batch" : "✍️ Manual"}
+                            </span>
+                            <span className="text-[9px] text-slate-400 block mt-0.5 truncate max-w-[120px]" title={sourceLabel}>{sourceLabel}</span>
+                          </td>
+                          <td className="px-6 py-3.5">
+                            {r.isAnomaly ? (
+                              <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-bold uppercase inline-flex items-center gap-1">
+                                ⚠️ Leak Alert
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold uppercase inline-flex items-center gap-1">
+                                ✓ Verified
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-slate-400">No meter readings recorded yet.</td>
+                      <td colSpan={6} className="px-6 py-12 text-center text-slate-400">No meter readings recorded yet.</td>
                     </tr>
                   )}
                 </tbody>

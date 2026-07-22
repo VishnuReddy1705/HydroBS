@@ -252,6 +252,14 @@ public class WaterController {
                     meterReadingRepository.save(meterReading);
                     successCount++;
 
+                    // Recalculate and update resident bill for month
+                    try {
+                        String uBy = (job.getUploadedBy() != null && job.getUploadedBy().getEmail() != null) ? job.getUploadedBy().getEmail() : "CSV Upload";
+                        billingEngineService.generateSingleResidentBill(resident, community, readingDate.withDayOfMonth(1), uBy, "CSV reading bill generation", true);
+                    } catch (Exception ex) {
+                        System.err.println("Error generating bill for resident " + resident.getId() + " after CSV upload: " + ex.getMessage());
+                    }
+
                     if (meterReading.getIsAnomaly() != null && meterReading.getIsAnomaly()) {
                         Notification alertNotif = Notification.builder()
                                 .user(resident)
@@ -571,7 +579,7 @@ public class WaterController {
 
         // Automatically calculate & generate bill for resident based on tariff
         try {
-            billingEngineService.generateSingleResidentBill(resident, community, date, caller.getEmail(), "Manual reading bill generation", true);
+            billingEngineService.generateSingleResidentBill(resident, community, date.withDayOfMonth(1), caller.getEmail(), "Manual reading bill generation", true);
         } catch (Exception e) {
             System.err.println("Error auto-generating bill after manual reading: " + e.getMessage());
         }
@@ -761,7 +769,14 @@ public class WaterController {
         }
 
         List<MeterReading> filteredList = stream
-                .sorted((a, b) -> b.getReadingDate().compareTo(a.getReadingDate()))
+                .sorted((a, b) -> {
+                    int cmp = b.getReadingDate().compareTo(a.getReadingDate());
+                    if (cmp != 0) return cmp;
+                    if (b.getCreatedAt() != null && a.getCreatedAt() != null) {
+                        return b.getCreatedAt().compareTo(a.getCreatedAt());
+                    }
+                    return Long.compare(b.getId() != null ? b.getId() : 0L, a.getId() != null ? a.getId() : 0L);
+                })
                 .toList();
 
         int total = filteredList.size();
