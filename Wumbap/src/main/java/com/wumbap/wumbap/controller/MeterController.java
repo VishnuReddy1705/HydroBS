@@ -30,7 +30,7 @@ public class MeterController {
     private final AuditLogService auditLogService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RESIDENT')")
     public ResponseEntity<?> getMeters(
             @RequestParam(value = "communityId", required = false) Long communityId,
             @RequestParam(value = "status", required = false) String status,

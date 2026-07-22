@@ -40,6 +40,23 @@ public class Announcement {
     @Builder.Default
     private boolean isArchived = false;
 
+    @Column(name = "priority", length = 50)
+    @Builder.Default
+    private String priority = "NORMAL";
+
+    @Column(name = "audience", length = 100)
+    @Builder.Default
+    private String audience = "Entire Community";
+
+    @Column(name = "target_buildings", length = 255)
+    private String targetBuildings;
+
+    @Column(name = "target_flats", length = 255)
+    private String targetFlats;
+
+    @Column(name = "target_residents", length = 255)
+    private String targetResidents;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

@@ -81,12 +81,25 @@ public class ReportService {
             BigDecimal maxUsage
     ) {
         Map<String, Object> data = new HashMap<>();
-        String title = reportType.toUpperCase() + " REPORT (" + frequency.toUpperCase() + " - " + year + ")";
+        String timeSpan = (startDate != null || endDate != null) 
+                ? (startDate != null ? startDate.toString() : "Beginning") + " to " + (endDate != null ? endDate.toString() : "Present")
+                : frequency.toUpperCase() + " - " + year;
+        String title = reportType.toUpperCase() + " REPORT (" + timeSpan + ")";
         data.put("title", title);
 
         // Fetch primary pools
         List<WaterBill> bills = waterBillRepository.findAll().stream()
-                .filter(b -> b.getBillingMonth().getYear() == year)
+                .filter(b -> {
+                    if (startDate != null && endDate != null) {
+                        return !b.getBillingMonth().isBefore(startDate) && !b.getBillingMonth().isAfter(endDate);
+                    } else if (startDate != null) {
+                        return !b.getBillingMonth().isBefore(startDate);
+                    } else if (endDate != null) {
+                        return !b.getBillingMonth().isAfter(endDate);
+                    } else {
+                        return b.getBillingMonth().getYear() == year;
+                    }
+                })
                 .filter(b -> communityId == null || (b.getCommunity() != null && b.getCommunity().getId().equals(communityId)))
                 .filter(b -> billingCycleId == null || (b.getBillingCycle() != null && b.getBillingCycle().getId().equals(billingCycleId)))
                 .filter(b -> paymentStatus == null || paymentStatus.isEmpty() || paymentStatus.equalsIgnoreCase(b.getStatus()))
@@ -95,12 +108,20 @@ public class ReportService {
                 .toList();
 
         List<MeterReading> readings = meterReadingRepository.findAll().stream()
-                .filter(r -> r.getReadingDate().getYear() == year)
+                .filter(r -> {
+                    if (startDate != null && endDate != null) {
+                        return !r.getReadingDate().isBefore(startDate) && !r.getReadingDate().isAfter(endDate);
+                    } else if (startDate != null) {
+                        return !r.getReadingDate().isBefore(startDate);
+                    } else if (endDate != null) {
+                        return !r.getReadingDate().isAfter(endDate);
+                    } else {
+                        return r.getReadingDate().getYear() == year;
+                    }
+                })
                 .filter(r -> communityId == null || (r.getCommunity() != null && r.getCommunity().getId().equals(communityId)))
                 .filter(r -> residentId == null || (r.getResident() != null && r.getResident().getId().equals(residentId)))
                 .filter(r -> building == null || building.isEmpty() || (r.getResident() != null && building.equalsIgnoreCase(r.getResident().getBuilding())))
-                .filter(r -> startDate == null || !r.getReadingDate().isBefore(startDate))
-                .filter(r -> endDate == null || !r.getReadingDate().isAfter(endDate))
                 .filter(r -> minUsage == null || (r.getUsageLitres() != null && r.getUsageLitres().compareTo(minUsage) >= 0))
                 .filter(r -> maxUsage == null || (r.getUsageLitres() != null && r.getUsageLitres().compareTo(maxUsage) <= 0))
                 .toList();
@@ -112,13 +133,15 @@ public class ReportService {
                 .filter(u -> building == null || building.isEmpty() || building.equalsIgnoreCase(u.getBuilding()))
                 .toList();
 
-        // Apply Month/Quarter filter to bills
-        if ("MONTHLY".equalsIgnoreCase(frequency) && month != null) {
-            bills = bills.stream().filter(b -> b.getBillingMonth().getMonthValue() == month).toList();
-        } else if ("QUARTERLY".equalsIgnoreCase(frequency) && quarter != null) {
-            int startM = (quarter - 1) * 3 + 1;
-            int endM = quarter * 3;
-            bills = bills.stream().filter(b -> b.getBillingMonth().getMonthValue() >= startM && b.getBillingMonth().getMonthValue() <= endM).toList();
+        // Apply Month/Quarter filter to bills ONLY if no specific custom date range is set
+        if (startDate == null && endDate == null) {
+            if ("MONTHLY".equalsIgnoreCase(frequency) && month != null) {
+                bills = bills.stream().filter(b -> b.getBillingMonth().getMonthValue() == month).toList();
+            } else if ("QUARTERLY".equalsIgnoreCase(frequency) && quarter != null) {
+                int startM = (quarter - 1) * 3 + 1;
+                int endM = quarter * 3;
+                bills = bills.stream().filter(b -> b.getBillingMonth().getMonthValue() >= startM && b.getBillingMonth().getMonthValue() <= endM).toList();
+            }
         }
 
         List<String> headers = new ArrayList<>();
@@ -370,9 +393,9 @@ public class ReportService {
                 rows.add(List.of(
                         p.getPaidAt().toString(),
                         p.getBill().getInvoiceNumber(),
-                        p.getBill().getResident().getFullName(),
-                        p.getBill().getResident().getFlatNumber(),
-                        p.getBill().getCommunity().getName(),
+                        (p.getBill().getResident() != null) ? p.getBill().getResident().getFullName() : "N/A",
+                        (p.getBill().getResident() != null) ? p.getBill().getResident().getFlatNumber() : "N/A",
+                        (p.getBill().getCommunity() != null) ? p.getBill().getCommunity().getName() : "N/A",
                         "₹" + p.getAmount().setScale(2, RoundingMode.HALF_UP),
                         p.getPaymentMethod(),
                         p.getStatus()
@@ -389,8 +412,8 @@ public class ReportService {
                         b.getBillNumber() != null ? b.getBillNumber() : "N/A",
                         b.getInvoiceNumber() != null ? b.getInvoiceNumber() : "N/A",
                         b.getBillingMonth().toString(),
-                        b.getResident().getFullName(),
-                        b.getResident().getFlatNumber(),
+                        (b.getResident() != null) ? b.getResident().getFullName() : "N/A",
+                        (b.getResident() != null) ? b.getResident().getFlatNumber() : "N/A",
                         b.getTotalUsage().setScale(0, RoundingMode.HALF_UP) + " L",
                         "₹" + b.getAmount().setScale(2, RoundingMode.HALF_UP),
                         b.getDueDate().toString(),
@@ -403,9 +426,9 @@ public class ReportService {
             headers.addAll(List.of("Resident Name", "Flat", "Community", "Reading Date", "Current Value", "Usage (L)", "Anomaly State"));
             for (MeterReading r : readings) {
                 rows.add(List.of(
-                        r.getResident().getFullName(),
-                        r.getResident().getFlatNumber(),
-                        r.getCommunity().getName(),
+                        (r.getResident() != null) ? r.getResident().getFullName() : "N/A",
+                        (r.getResident() != null) ? r.getResident().getFlatNumber() : "N/A",
+                        (r.getCommunity() != null) ? r.getCommunity().getName() : "N/A",
                         r.getReadingDate().toString(),
                         r.getCurrentReading().setScale(2, RoundingMode.HALF_UP),
                         r.getUsageLitres().setScale(0, RoundingMode.HALF_UP) + " L",

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  DollarSign, Percent, Settings, Plus, Trash2, CheckCircle, 
-  AlertTriangle, RotateCw, Shield, Info, Edit, ArrowLeft, Disc, RefreshCw
+  Percent, Settings, Plus, Trash2, CheckCircle, 
+  AlertTriangle, RotateCw, Info, Edit, ArrowLeft, Disc, RefreshCw
 } from 'lucide-react';
 import { billingService, type Tariff, type TariffSlab } from '../services/billingService';
 import { getCommunityId } from '@/lib/auth';

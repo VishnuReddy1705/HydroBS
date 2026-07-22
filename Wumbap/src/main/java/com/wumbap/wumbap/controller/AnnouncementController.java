@@ -45,7 +45,35 @@ public class AnnouncementController {
             announcements.addAll(announcementService.getGlobalAnnouncements());
         } else { // Resident
             if (user.getCommunity() != null) {
-                announcements.addAll(announcementService.getCommunityAnnouncements(user.getCommunity().getId()));
+                List<Announcement> communityAnnouncements = announcementService.getCommunityAnnouncements(user.getCommunity().getId());
+                List<Announcement> targeted = communityAnnouncements.stream()
+                        .filter(a -> {
+                            String aud = a.getAudience();
+                            if (aud == null || "Entire Community".equalsIgnoreCase(aud) || "COMMUNITY".equalsIgnoreCase(aud)) {
+                                return true;
+                            }
+                            if ("Selected Buildings".equalsIgnoreCase(aud) || "BUILDING".equalsIgnoreCase(aud)) {
+                                if (a.getTargetBuildings() == null || user.getBuilding() == null) return false;
+                                return java.util.Arrays.stream(a.getTargetBuildings().split(","))
+                                        .map(String::trim)
+                                        .anyMatch(b -> b.equalsIgnoreCase(user.getBuilding().trim()));
+                            }
+                            if ("Selected Flats".equalsIgnoreCase(aud) || "FLAT".equalsIgnoreCase(aud)) {
+                                if (a.getTargetFlats() == null || user.getFlatNumber() == null) return false;
+                                return java.util.Arrays.stream(a.getTargetFlats().split(","))
+                                        .map(String::trim)
+                                        .anyMatch(f -> f.equalsIgnoreCase(user.getFlatNumber().trim()));
+                            }
+                            if ("Selected Residents".equalsIgnoreCase(aud) || "RESIDENT".equalsIgnoreCase(aud)) {
+                                if (a.getTargetResidents() == null) return false;
+                                return java.util.Arrays.stream(a.getTargetResidents().split(","))
+                                        .map(String::trim)
+                                        .anyMatch(r -> r.equalsIgnoreCase(user.getEmail().trim()) || r.equals(user.getId().toString()));
+                            }
+                            return true;
+                        })
+                        .toList();
+                announcements.addAll(targeted);
             }
             announcements.addAll(announcementService.getGlobalAnnouncements());
         }
@@ -76,10 +104,28 @@ public class AnnouncementController {
 
         LocalDateTime expiryDate = null;
         if (req.get("expiryDate") != null) {
-            expiryDate = LocalDateTime.parse(req.get("expiryDate").toString());
+            try {
+                String expStr = req.get("expiryDate").toString();
+                if (expStr.contains("Z")) {
+                    expiryDate = java.time.Instant.parse(expStr).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime();
+                } else if (expStr.length() >= 19) {
+                    expiryDate = LocalDateTime.parse(expStr.substring(0, 19));
+                }
+            } catch (Exception e) {
+                expiryDate = LocalDateTime.now().plusDays(7);
+            }
         }
 
-        Announcement announcement = announcementService.createAnnouncement(title, content, user, community, expiryDate);
+        String priority = req.get("priority") != null ? (String) req.get("priority") : "NORMAL";
+        String audience = req.get("audience") != null ? (String) req.get("audience") : "Entire Community";
+        String targetBuildings = (String) req.get("targetBuildings");
+        String targetFlats = (String) req.get("targetFlats");
+        String targetResidents = (String) req.get("targetResidents");
+
+        Announcement announcement = announcementService.createAnnouncement(
+                title, content, user, community, expiryDate,
+                priority, audience, targetBuildings, targetFlats, targetResidents
+        );
         auditLogService.log(user.getEmail(), "ANNOUNCEMENT_CREATED", "Announcement created with title: " + title);
 
         return ResponseEntity.ok(announcement);

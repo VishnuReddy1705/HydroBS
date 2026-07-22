@@ -1,0 +1,131 @@
+========================================================================
+                      HYDROBS - WATER MONITORING & BILLING SUITE
+                             PROJECT JIST & SUMMARY
+========================================================================
+
+1. OVERVIEW & GOAL
+------------------------------------------------------------------------
+HydroBS is an enterprise-grade Software-as-a-Service (SaaS) utility 
+management suite designed to monitor water consumption, coordinate community 
+water supplies, detect leaks, compute slab/proportional billing, and generate 
+detailed financial reports for housing communities.
+
+Its primary goals are to:
+- Trace water consumption down to specific towers, flats, and residents.
+- Manage billing, invoice generation, payment statuses, and collections.
+- Coordinate water stock replenishment via external tanker purchases.
+- Facilitate real-time updates and synchronization across client dashboards.
+
+
+2. TECHNOLOGY STACK
+------------------------------------------------------------------------
+* CORE RUNTIMES & FRAMEWORKS:
+  - Backend: Java 21 + Spring Boot 3.4.5 (Spring MVC, Spring Security, 
+    Spring Data JPA)
+  - Frontend: Vite + React 18 + TypeScript + Recharts + TailwindCSS (for 
+    layout structures) + Lucide Icons
+
+* DATABASE & PERSISTENCE:
+  - Database: PostgreSQL 17.10
+  - Migration Tool: Flyway (18 migrations defining tables, keys, and indexes)
+  - ORM Engine: Hibernate 6.6 / JPA
+  - Note: Open Session in View (OSIV) is disabled (`spring.jpa.open-in-view=false`)
+
+* GRAPHING & CHARTS:
+  - Recharts (Area, Bar, Line, and Pie Charts for analytics rendering)
+
+* REAL-TIME SYNCHRONIZATION:
+  - Frontend Polling Hooks (5-second auto-polling loops syncing dashboard data)
+
+
+3. USER ROLES & PERMISSIONS
+------------------------------------------------------------------------
+* SUPER ADMIN:
+  - Global platform control.
+  - Manages public/private communities and approves/assigns Community Admins.
+  - Monitors global platform revenue, total water usage, and system health metrics.
+
+* COMMUNITY ADMIN:
+  - Local administrator for a specific housing community (e.g. apartment complex).
+  - Manages building wings, flats, residents, water meters, and tariffs.
+  - Performs manual meter reading entries and bulk CSV uploads of readings.
+  - Generates billing cycles, triggers invoices, logs tanker purchases, and 
+    publishes community announcements.
+
+* RESIDENT:
+  - End-user representing a flat owner or tenant.
+  - Views personal usage trends, meter readings, water bills, and payment status.
+  - Updates profile, registers family members, uploads verification documents, 
+    and views notifications or announcements.
+
+
+4. CORE MODULES & FEATURES
+------------------------------------------------------------------------
+* DASHBOARD:
+  - Executive summary widgets tracking total usage, revenue, outstanding balances,
+    active meters, and collection rates. Includes real-time auto-polling sync.
+* COMMUNITIES:
+  - Registry of housing networks, building configurations, and configurations.
+* RESIDENTS MANAGEMENT:
+  - CRUD operations on residents, assignment to flats/meters, and profile setup.
+* METER READINGS:
+  - Manual and batch CSV data ingestion of current meter values.
+* BILLING ENGINE:
+  - Dynamic bill generation supporting SLA (slab-based consumption tier pricing)
+    and OCCUPANCY (proportional shared-area cost distribution) tariff models.
+* WATER TANNER PURCHASES:
+  - Ledger tracks external supplier tankers, costs, volumetric capacity, and 
+    auto-updates community water stock counters.
+* REPORTING & BI CENTER:
+  - Custom reports generator equipped with Date Range, Community, Building, and 
+    Resident filters. Styled with a dark cyberpunk BI theme.
+* AUDIT TRAILS:
+  - Immutable server-side log auditing platform events (logins, uploads, billing, 
+    purchases, and status edits).
+* ANNOUNCEMENTS & NOTIFICATIONS:
+  - Audience-targeted bulletin broadcasts delivering alerts to specific wings, 
+    flats, or residents.
+
+
+5. ARCHITECTURAL DATA FLOWS
+------------------------------------------------------------------------
+* AUTHENTICATION FLOW:
+  Login Request -> AuthenticationController -> UserDetailsService -> 
+  JWT Token Generated -> LocalStorage Storage -> Intercepted Protected API Calls
+
+* METER READING INGESTION:
+  CSV Upload / Manual -> Validation -> database (meter_readings) -> 
+  Auto-Calculation of Usage -> Auto-Update Dashboards & Logs -> 
+  Triggers Billing Engine
+
+* BILLING RUN OPERATION:
+  Meter Readings -> Consumption Tier Assessment -> Tariff Application -> 
+  Bill Entity Generated -> Invoice Entity Created -> PDF Render Asset Generated
+
+* REPORT PREVIEW GENERATION:
+  Filter Criteria -> JPA Aggregation Query -> BI Dashboard Recharts Format -> 
+  Export Payload (PDF / Excel / CSV / Print Stream)
+
+
+6. DESIGN AESTHETICS & LAYOUTS
+------------------------------------------------------------------------
+The application adheres to a unified visual language:
+- Dark Cyberpunk Theme: Uses Deep Blue (#071321, #0b1f35) surfaces, Cyan (#17c8d8, 
+  #34d8e8) highlight indicators, Slate text classes, and glowing thin borders.
+- Standard spacing, consistent font weight hierarchies, custom dialog cards, 
+  smooth transitions, and responsive grids.
+- No page deviations: Page components inherit design systems dynamically from the 
+  top-level Tailwind configs.
+
+
+7. RECENT DEVELOPMENTS & BUG FIXES
+------------------------------------------------------------------------
+- LazyInitializationException Fixes: Added @Transactional(readOnly = true) to 
+  GET mapping routes (such as `/api/users/me` and `/api/profile/me`), preventing 
+  crashes from lazy relationship loading under disabled OSIV.
+- Redesigned Reports UI: Rebuilt filter forms and output preview card containers 
+  to match the exact colors, typography, and charts of the BI Dashboard.
+- Real-Time Synchronization: Wired a 5-second automatic polling fallback to frontend 
+  dashboards, ensuring manual readings and CSV uploads reflect instantly without 
+  page refreshes.
+========================================================================

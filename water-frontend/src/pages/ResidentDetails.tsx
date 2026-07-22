@@ -4,12 +4,11 @@ import { residentService } from "../services/residentService";
 import { api } from "@/lib/axios";
 import DashboardLayout from "../components/DashboardLayout";
 import { 
-  User, Mail, Phone, Calendar, Shield, MapPin, Building, Key, 
-  Droplet, FileText, Download, Trash2, ArrowLeft, Loader2, CheckCircle2, 
-  AlertTriangle, DollarSign, Clock, Users, ArrowUpRight, BarChart3, Settings
+  User, Phone, Calendar, Shield, MapPin, Building, Key, 
+  FileText, Download, ArrowLeft, Loader2, CheckCircle2, 
+  DollarSign, Clock, Users, BarChart3
 } from "lucide-react";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 export default function ResidentDetails({ id: propId, isTab = false }: { id?: string, isTab?: boolean }) {
@@ -58,9 +57,13 @@ export default function ResidentDetails({ id: propId, isTab = false }: { id?: st
       // Load timeline logs
       const timeRes = await api.get(`/api/profile/timeline?residentId=${id}`);
       setTimeline(timeRes.data || []);
-    } catch (err: any) {
+    } catch  {
       toast.error("Failed to load resident details or permissions denied.");
-      navigate("/residents");
+      if (isTab) {
+        navigate("/admin/dashboard?tab=residents");
+      } else {
+        navigate(-1);
+      }
     } finally {
       setLoading(false);
     }
@@ -87,12 +90,14 @@ export default function ResidentDetails({ id: propId, isTab = false }: { id?: st
   const mainContent = (
     <div className="space-y-6 text-slate-800 dark:text-slate-100">
         {/* Back Button */}
-        <button 
-          onClick={() => navigate(-1)} 
-          className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all font-bold text-xs cursor-pointer"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to List
-        </button>
+        {!isTab && (
+          <button 
+            onClick={() => navigate(-1)} 
+            className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all font-bold text-xs cursor-pointer"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to List
+          </button>
+        )}
 
         {/* Profile Card Header */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

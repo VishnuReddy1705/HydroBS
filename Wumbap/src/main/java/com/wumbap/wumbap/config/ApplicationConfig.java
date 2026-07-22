@@ -38,8 +38,21 @@ public class ApplicationConfig {
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
-        // Spring Security 7 constructor injection syntax
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService());
+        DaoAuthenticationProvider authProvider;
+        try {
+            // Spring Security 7 constructor: DaoAuthenticationProvider(UserDetailsService)
+            java.lang.reflect.Constructor<DaoAuthenticationProvider> constructor = 
+                    DaoAuthenticationProvider.class.getConstructor(UserDetailsService.class);
+            authProvider = constructor.newInstance(userDetailsService());
+        } catch (Exception e) {
+            // Spring Security 5/6 fallback: DaoAuthenticationProvider()
+            try {
+                authProvider = DaoAuthenticationProvider.class.getDeclaredConstructor().newInstance();
+                authProvider.setUserDetailsService(userDetailsService());
+            } catch (Exception ex) {
+                throw new IllegalStateException("Failed to instantiate DaoAuthenticationProvider", ex);
+            }
+        }
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }

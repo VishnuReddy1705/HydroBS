@@ -2,8 +2,12 @@ import axios from 'axios';
 import { getToken, getRefreshToken, updateAccessToken, clearSession } from '@/lib/auth';
 import { toast } from 'sonner';
 
+// API base URL is environment-driven (set VITE_API_URL in .env for each deployment);
+// defaults to the local Spring Boot server for development.
+export const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+
 const api = axios.create({
-  baseURL: 'http://localhost:8080', // Point to Spring Boot
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -44,13 +48,16 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Handle 403 Forbidden - do not redirect to login, show access denied toast
+    // Handle 403 Forbidden - reject silently without popping toast for background requests
     if (error.response?.status === 403) {
-      toast.error(error.response.data?.message || "Access Denied: You do not have permission to perform this action.");
       return Promise.reject(error);
     }
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Never attempt a token refresh for auth endpoints (login/refresh failures are
+    // real credential errors, not expired sessions).
+    const isAuthEndpoint = typeof originalRequest?.url === 'string' && originalRequest.url.includes('/api/auth/');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
@@ -71,14 +78,12 @@ api.interceptors.response.use(
 
       const refreshToken = getRefreshToken();
       if (!refreshToken) {
-        clearSession();
-        window.location.href = '/login';
         return Promise.reject(error);
       }
 
       return new Promise(function (resolve, reject) {
         axios
-          .post('http://localhost:8080/api/auth/refresh-token', { refreshToken })
+          .post(`${API_BASE_URL}/api/auth/refresh-token`, { refreshToken })
           .then(({ data }) => {
             updateAccessToken(data.accessToken);
             api.defaults.headers.common['Authorization'] = 'Bearer ' + data.accessToken;
@@ -90,8 +95,6 @@ api.interceptors.response.use(
           })
           .catch((err) => {
             processQueue(err, null);
-            clearSession();
-            window.location.href = '/login';
             reject(err);
           })
           .finally(() => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Plus, Edit, Trash2, Shield, ToggleLeft, ToggleRight, Loader2, Building, RefreshCw, X, Check } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, ToggleLeft, ToggleRight, Loader2, Building, RefreshCw, X, Check } from 'lucide-react';
 import api from '@/api';
 import { toast } from 'sonner';
 
@@ -41,7 +41,7 @@ export default function UserManagementPage() {
 
       const comms = await api.get('/api/super-admin/communities');
       setCommunities(comms.data || []);
-    } catch (err) {
+    } catch  {
       toast.error('Failed to load platform users');
     } finally {
       setLoading(false);
@@ -117,7 +117,7 @@ export default function UserManagementPage() {
       await api.post(`/api/super-admin/users/${id}/toggle-active`);
       setUsers(prev => prev.map(u => u.id === id ? { ...u, isActive: !u.isActive } : u));
       toast.success('User state toggled successfully');
-    } catch (err) {
+    } catch  {
       toast.error('Failed to toggle user status');
     }
   };
@@ -128,7 +128,7 @@ export default function UserManagementPage() {
       await api.delete(`/api/super-admin/users/${id}`);
       setUsers(prev => prev.filter(u => u.id !== id));
       toast.success('User deleted successfully');
-    } catch (err) {
+    } catch  {
       toast.error('Failed to delete user');
     }
   };

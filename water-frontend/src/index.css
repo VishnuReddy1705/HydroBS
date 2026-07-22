@@ -8,16 +8,14 @@
   --color-accent: #2ECC71;
   --color-accent-foreground: #ffffff;
   --color-highlight: #48CAE4;
-  
-  --color-background: var(--color-background);
-  --color-foreground: var(--color-foreground);
-  --color-muted: var(--color-muted);
-  --color-muted-foreground: var(--color-muted-foreground);
-  --color-card: var(--color-card);
-  --color-card-foreground: var(--color-card-foreground);
-  --color-border: var(--color-border);
-  --color-input: var(--color-input);
-  
+  --color-background: #F5FAFC;
+  --color-foreground: #1F2937;
+  --color-muted: #F1F7F9;
+  --color-muted-foreground: #4B5563;
+  --color-card: #ffffff;
+  --color-card-foreground: #1F2937;
+  --color-border: #E2E8F0;
+  --color-input: #E2E8F0;
   --color-ring: #0F4C81;
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
@@ -31,17 +29,6 @@
   :root {
     --primary-rgb: 15, 76, 129;
     --secondary-rgb: 0, 180, 216;
-    --background: 210 30% 98%;
-    --foreground: 222.2 47.4% 11.2%;
-    
-    --color-background: #F5FAFC;
-    --color-foreground: #1F2937;
-    --color-muted: #F1F7F9;
-    --color-muted-foreground: #4B5563;
-    --color-card: #ffffff;
-    --color-card-foreground: #1F2937;
-    --color-border: #E2E8F0;
-    --color-input: #E2E8F0;
   }
 
   .dark {

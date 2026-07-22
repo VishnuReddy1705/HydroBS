@@ -39,6 +39,18 @@ public class Payment {
     @Column(name = "paid_at", nullable = false)
     private LocalDateTime paidAt;
 
+    @Column(name = "receipt_number", length = 100)
+    private String receiptNumber;
+
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
+
+    @Column(name = "reversed_at")
+    private LocalDateTime reversedAt;
+
+    @Column(name = "reversal_reason", length = 255)
+    private String reversalReason;
+
     @PrePersist
     public void prePersist() {
         if (paidAt == null) {

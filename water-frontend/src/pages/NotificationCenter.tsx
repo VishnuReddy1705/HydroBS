@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Check, Trash2, Archive, ShieldAlert, FileText, Settings, Volume2, Search, Filter, MailOpen, RefreshCw } from 'lucide-react';
+import { Bell, Check, Archive, ShieldAlert, FileText, Volume2, Search, MailOpen, RefreshCw } from 'lucide-react';
 import api from '@/api';
 import { toast } from 'sonner';
 
@@ -24,7 +24,7 @@ export default function NotificationCenter() {
       setLoading(true);
       const res = await api.get('/api/notifications');
       setNotifications(res.data || []);
-    } catch (err) {
+    } catch  {
       toast.error('Failed to load notifications');
     } finally {
       setLoading(false);
@@ -40,7 +40,7 @@ export default function NotificationCenter() {
       await api.post(`/api/notifications/${id}/read`);
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
       toast.success('Notification marked as read');
-    } catch (err) {
+    } catch  {
       toast.error('Failed to mark notification as read');
     }
   };
@@ -50,7 +50,7 @@ export default function NotificationCenter() {
       await api.post('/api/notifications/read-all');
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       toast.success('All notifications marked as read');
-    } catch (err) {
+    } catch  {
       toast.error('Failed to mark all as read');
     }
   };
@@ -60,7 +60,7 @@ export default function NotificationCenter() {
       await api.post(`/api/notifications/${id}/archive`);
       setNotifications(prev => prev.filter(n => n.id !== id));
       toast.success('Notification archived');
-    } catch (err) {
+    } catch  {
       toast.error('Failed to archive notification');
     }
   };
@@ -70,7 +70,7 @@ export default function NotificationCenter() {
       await api.post('/api/notifications/archive-all');
       setNotifications([]);
       toast.success('All notifications archived');
-    } catch (err) {
+    } catch  {
       toast.error('Failed to archive all notifications');
     }
   };

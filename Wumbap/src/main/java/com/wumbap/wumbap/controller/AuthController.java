@@ -10,6 +10,7 @@ import com.wumbap.wumbap.repository.UserRepository;
 import com.wumbap.wumbap.service.AuthService;
 import com.wumbap.wumbap.service.RefreshTokenService;
 import com.wumbap.wumbap.security.JwtService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -33,17 +34,17 @@ public class AuthController {
     private final JwtService jwtService;
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
     }
 
     @PostMapping("/register-resident")
-    public ResponseEntity<AuthResponse> registerResident(@RequestBody RegisterResidentRequest request) {
+    public ResponseEntity<AuthResponse> registerResident(@Valid @RequestBody RegisterResidentRequest request) {
         return ResponseEntity.ok(authService.register(request));
     }
 
     @PostMapping("/register-admin")
-    public ResponseEntity<?> registerAdmin(@RequestBody RegisterAdminRequest request) {
+    public ResponseEntity<?> registerAdmin(@Valid @RequestBody RegisterAdminRequest request) {
         if (userRepository.findByEmail(request.email()).isPresent()) {
             return ResponseEntity.badRequest().body("Email already exists");
         }
@@ -100,7 +101,7 @@ public class AuthController {
     }
 
     @PostMapping("/refresh-token")
-    public ResponseEntity<?> refreshToken(@RequestBody TokenRefreshRequest request) {
+    public ResponseEntity<?> refreshToken(@Valid @RequestBody TokenRefreshRequest request) {
         String requestRefreshToken = request.getRefreshToken();
 
         return refreshTokenService.findByToken(requestRefreshToken)
@@ -120,13 +121,13 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         authService.forgotPassword(request.getEmail());
         return ResponseEntity.ok("If an account with that email exists, a reset link has been sent.");
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request.getToken(), request.getNewPassword());
         return ResponseEntity.ok("Password successfully reset.");
     }

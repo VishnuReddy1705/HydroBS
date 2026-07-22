@@ -4,6 +4,7 @@ import com.wumbap.wumbap.entity.*;
 import com.wumbap.wumbap.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -16,6 +17,7 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class DashboardService {
 
     private final UserRepository userRepository;
@@ -27,6 +29,7 @@ public class DashboardService {
     private final UploadJobRepository uploadJobRepository;
     private final NotificationRepository notificationRepository;
     private final UsageArchiveRepository usageArchiveRepository;
+    private final BulkWaterPurchaseRepository bulkWaterPurchaseRepository;
 
     public Map<String, Object> getSuperAdminStats() {
         Map<String, Object> stats = new HashMap<>();
@@ -269,6 +272,9 @@ public class DashboardService {
         String communityName = admin.getCommunity().getName();
         stats.put("communityName", communityName);
         stats.put("tariffRate", admin.getCommunity().getTariffRate());
+        stats.put("tier1LimitLitres", admin.getCommunity().getTier1LimitLitres());
+        stats.put("tier1Rate", admin.getCommunity().getTier1Rate());
+        stats.put("tier2Rate", admin.getCommunity().getTier2Rate());
         stats.put("taxRate", admin.getCommunity().getTaxRate());
         stats.put("lateFeeRate", admin.getCommunity().getLateFeeRate());
         stats.put("discountRate", admin.getCommunity().getDiscountRate());
@@ -301,6 +307,11 @@ public class DashboardService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         stats.put("totalWaterUsed", thisMonthUsage.setScale(0, java.math.RoundingMode.HALF_UP) + " L");
 
+        BigDecimal avgPerRes = totalUsers > 0 
+                ? thisMonthUsage.divide(new BigDecimal(totalUsers), 0, java.math.RoundingMode.HALF_UP) 
+                : BigDecimal.ZERO;
+        stats.put("avgUsagePerResident", avgPerRes.setScale(0, java.math.RoundingMode.HALF_UP) + " L");
+
         BigDecimal lastMonthUsage = communityReadings.stream()
                 .filter(r -> !r.getReadingDate().isBefore(startOfLastMonth) && !r.getReadingDate().isAfter(endOfLastMonth))
                 .map(MeterReading::getUsageLitres)
@@ -318,12 +329,22 @@ public class DashboardService {
         }
         stats.put("usageChange", usageChange);
 
-        BigDecimal waterPurchased = thisMonthUsage.multiply(new BigDecimal("1.15"));
+        BigDecimal waterPurchased = bulkWaterPurchaseRepository.findByCommunityId(communityId).stream()
+                .filter(p -> p.getPurchaseDate() != null 
+                        && !p.getPurchaseDate().isBefore(startOfMonth) 
+                        && !p.getPurchaseDate().isAfter(endOfMonth))
+                .map(BulkWaterPurchase::getVolumeLitres)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         stats.put("waterPurchased", waterPurchased.setScale(0, java.math.RoundingMode.HALF_UP) + " L");
 
         String purchaseChange = "Stable";
-        if (lastMonthUsage.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal lastPurchased = lastMonthUsage.multiply(new BigDecimal("1.15"));
+        BigDecimal lastPurchased = bulkWaterPurchaseRepository.findByCommunityId(communityId).stream()
+                .filter(p -> p.getPurchaseDate() != null 
+                        && !p.getPurchaseDate().isBefore(startOfLastMonth) 
+                        && !p.getPurchaseDate().isAfter(endOfLastMonth))
+                .map(BulkWaterPurchase::getVolumeLitres)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (lastPurchased.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal diff = waterPurchased.subtract(lastPurchased);
             BigDecimal percentage = diff.multiply(new BigDecimal("100")).divide(lastPurchased, 1, java.math.RoundingMode.HALF_UP);
             if (percentage.compareTo(BigDecimal.ZERO) > 0) {
@@ -435,6 +456,7 @@ public class DashboardService {
                 .limit(10)
                 .map(b -> {
                     Map<String, Object> map = new HashMap<>();
+                    map.put("id", b.getId());
                     map.put("billNo", "INV-" + b.getId());
                     map.put("flat", "Flat " + b.getResident().getFlatNumber());
                     map.put("residentName", b.getResident().getFullName());

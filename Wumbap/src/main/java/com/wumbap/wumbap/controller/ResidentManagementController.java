@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -41,6 +42,7 @@ public class ResidentManagementController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional(readOnly = true)
     public ResponseEntity<?> getResidents(
             @RequestParam(required = false) Long communityId,
             @RequestParam(required = false) String search,
@@ -126,6 +128,7 @@ public class ResidentManagementController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional(readOnly = true)
     public ResponseEntity<?> getResidentById(@PathVariable Long id, Authentication authentication) {
         User caller = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Logged in user not found"));
@@ -538,6 +541,7 @@ public class ResidentManagementController {
 
     @GetMapping("/export")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional(readOnly = true)
     public ResponseEntity<?> exportResidents(Authentication authentication) {
         User caller = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Logged in user not found"));

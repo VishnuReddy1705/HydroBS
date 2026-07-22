@@ -3,9 +3,9 @@ import { residentService } from "../services/residentService";
 import { api } from "@/lib/axios";
 import DashboardLayout from "../components/DashboardLayout";
 import { 
-  User, Mail, Phone, Calendar, Shield, MapPin, Building, Key, 
-  Droplet, FileText, Download, Trash2, Loader2, CheckCircle2, 
-  Plus, Edit, Users, Clock, AlertTriangle, FileUp, ListFilter
+  User, Phone, Calendar, Shield, MapPin, Building, Key, 
+  FileText, Download, Trash2, Loader2, CheckCircle2, 
+  Plus, Edit, Users, Clock, FileUp
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -44,7 +44,7 @@ export default function ResidentProfilePage({ isTab = false }: { isTab?: boolean
 
       const time = await residentService.getMyTimeline();
       setTimeline(time);
-    } catch (err: any) {
+    } catch  {
       toast.error("Failed to load profile details.");
     } finally {
       setLoading(false);
@@ -86,7 +86,7 @@ export default function ResidentProfilePage({ isTab = false }: { isTab?: boolean
       // Reload family data
       const fm = await residentService.getMyFamily();
       setFamily(fm);
-    } catch (err: any) {
+    } catch  {
       toast.error("Failed to save family member.");
     }
   };
@@ -107,7 +107,7 @@ export default function ResidentProfilePage({ isTab = false }: { isTab?: boolean
       toast.success("Household member removed.");
       const fm = await residentService.getMyFamily();
       setFamily(fm);
-    } catch (err) {
+    } catch  {
       toast.error("Failed to remove family member.");
     }
   };
@@ -142,7 +142,7 @@ export default function ResidentProfilePage({ isTab = false }: { isTab?: boolean
       toast.success("Document deleted.");
       const docs = await residentService.getMyDocuments();
       setDocuments(docs);
-    } catch (err) {
+    } catch  {
       toast.error("Failed to delete document.");
     }
   };

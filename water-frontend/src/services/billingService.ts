@@ -50,6 +50,8 @@ export interface Bill {
   billNumber: string;
   invoiceNumber: string;
   billingMonth: string;
+  billingStartDate?: string;
+  billingEndDate?: string;
   totalUsage: number;
   tariffRate: number;
   taxAmount: number;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  BarChart3, Activity, Droplets, CreditCard, DollarSign, RefreshCw, 
-  ChevronDown, ChevronUp, Eye, EyeOff, Layout, Sparkles, AlertCircle, TrendingUp
+  BarChart3, Droplets, DollarSign, RefreshCw, 
+  ChevronDown, Eye, EyeOff, Sparkles, TrendingUp
 } from 'lucide-react';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -44,11 +44,11 @@ export default function AnalyticsDashboard() {
     // Load local storage preferences
     const savedVisibility = localStorage.getItem('bi_widget_visibility');
     if (savedVisibility) {
-      try { setVisibleWidgets(JSON.parse(savedVisibility)); } catch (e) {}
+      try { setVisibleWidgets(JSON.parse(savedVisibility)); } catch  {}
     }
     const savedOrder = localStorage.getItem('bi_widget_order');
     if (savedOrder) {
-      try { setWidgetsOrder(JSON.parse(savedOrder)); } catch (e) {}
+      try { setWidgetsOrder(JSON.parse(savedOrder)); } catch  {}
     }
 
     fetchAnalytics();
@@ -67,7 +67,7 @@ export default function AnalyticsDashboard() {
       setCharts(chartRes.data);
       setInsights(insightRes.data || []);
       toast.success('BI Metrics refreshed successfully.');
-    } catch (err) {
+    } catch  {
       toast.error('Failed to load enterprise BI analytics data.');
     } finally {
       setLoading(false);
@@ -87,7 +87,7 @@ export default function AnalyticsDashboard() {
         }));
       }
       toast.success('Widget refreshed.');
-    } catch (err) {
+    } catch  {
       toast.error('Failed to refresh widget.');
     }
   };

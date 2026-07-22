@@ -28,7 +28,7 @@ public class CalendarController {
     private final UserRepository userRepository;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RESIDENT')")
     public ResponseEntity<?> getCalendarEvents(
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,

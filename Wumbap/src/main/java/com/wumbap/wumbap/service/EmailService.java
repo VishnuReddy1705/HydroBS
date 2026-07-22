@@ -1,8 +1,6 @@
 package com.wumbap.wumbap.service;
 
-import com.wumbap.wumbap.entity.WaterBill;
-import com.wumbap.wumbap.entity.User;
-import com.wumbap.wumbap.entity.Community;
+import com.wumbap.wumbap.entity.*;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +10,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.format.DateTimeFormatter;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
@@ -19,6 +18,9 @@ import java.util.Optional;
 public class EmailService {
 
     private final JavaMailSender mailSender;
+
+    @org.springframework.beans.factory.annotation.Value("${app.frontend.base-url:http://localhost:5173}")
+    private String frontendBaseUrl;
 
     @Autowired
     public EmailService(Optional<JavaMailSender> mailSenderOpt) {
@@ -96,7 +98,7 @@ public class EmailService {
                 "<p>Your registration was successful. We are excited to help you manage and conserve your community's water resource intelligently.</p>" +
                 "<p><strong>User Role:</strong> <span class='badge'>" + user.getRole().name() + "</span></p>" +
                 "<p>Please log in to your dashboard to complete your profile set up and view real-time statistics.</p>" +
-                "<a href='http://localhost:5173/login' class='btn' style='color:#ffffff;'>Log In to Dashboard</a>";
+                "<a href='" + frontendBaseUrl + "/login' class='btn' style='color:#ffffff;'>Log In to Dashboard</a>";
         sendHtmlEmail(user.getEmail(), "Welcome to HydroBS!", getBaseTemplate("Welcome to HydroBS", content), null, null);
     }
 
@@ -105,7 +107,7 @@ public class EmailService {
                 "<p>Hello " + admin.getFullName() + ",</p>" +
                 "<p>We are pleased to inform you that your community <strong>" + community.getName() + "</strong> has been officially approved and activated on the HydroBS network.</p>" +
                 "<p>You can now log in, assign water meters, ingest reading templates, and launch billing cycles.</p>" +
-                "<a href='http://localhost:5173/login' class='btn' style='color:#ffffff;'>Admin Console Login</a>";
+                "<a href='" + frontendBaseUrl + "/login' class='btn' style='color:#ffffff;'>Admin Console Login</a>";
         sendHtmlEmail(admin.getEmail(), "Community Approved - " + community.getName(), getBaseTemplate("Community Approved", content), null, null);
     }
 
@@ -113,7 +115,7 @@ public class EmailService {
         String content = "<h2>Password Reset Request</h2>" +
                 "<p>We received a request to reset your password for your HydroBS account.</p>" +
                 "<p>Click the link below to configure your new credentials. This link expires in 1 hour.</p>" +
-                "<a href='http://localhost:5173/reset-password?token=" + token + "' class='btn' style='color:#ffffff;'>Reset Password</a>" +
+                "<a href='" + frontendBaseUrl + "/reset-password?token=" + token + "' class='btn' style='color:#ffffff;'>Reset Password</a>" +
                 "<p style='margin-top: 24px; font-size: 13px; color: #64748b;'>If you did not request this, please ignore this email.</p>";
         sendHtmlEmail(user.getEmail(), "Password Reset Request", getBaseTemplate("Reset Password Request", content), null, null);
     }
@@ -148,7 +150,7 @@ public class EmailService {
                 "  </tr>" +
                 "</table>" +
                 "<p style='margin-top: 16px;'>Please review the attached PDF invoice for full slab details, taxes, and service charges.</p>" +
-                "<a href='http://localhost:5173/resident/dashboard' class='btn' style='color:#ffffff;'>Pay Now (Razorpay Checkout)</a>";
+                "<a href='" + frontendBaseUrl + "/resident/dashboard' class='btn' style='color:#ffffff;'>Pay Now (Razorpay Checkout)</a>";
 
         String attachmentName = "Invoice_INV_" + bill.getId() + ".pdf";
         sendHtmlEmail(to, subject, getBaseTemplate("New Water Invoice", content), attachmentName, pdfBytes);
@@ -170,7 +172,7 @@ public class EmailService {
                 "<p>Your payment attempt for water invoice <strong>INV-" + bill.getId() + "</strong> failed.</p>" +
                 "<p><strong>Failure Reason:</strong> <span style='color: #ef4444; font-weight: bold;'>" + reason + "</span></p>" +
                 "<p>Please log in and retry the checkout process to avoid late payment fee interest charges.</p>" +
-                "<a href='http://localhost:5173/resident/dashboard' class='btn' style='color:#ffffff;'>Retry Payment</a>";
+                "<a href='" + frontendBaseUrl + "/resident/dashboard' class='btn' style='color:#ffffff;'>Retry Payment</a>";
         sendHtmlEmail(bill.getResident().getEmail(), "Payment Failed - INV-" + bill.getId(), getBaseTemplate("Payment Failed", content), null, null);
     }
 
@@ -197,4 +199,60 @@ public class EmailService {
                 "<p>Please review the import ledger dashboard for any error messages.</p>";
         sendHtmlEmail(admin.getEmail(), "Meter Reading Ingestion Report: " + filename, getBaseTemplate("Ingestion Report", content), null, null);
     }
+
+    public void sendPartialPaymentEmail(WaterBill bill, Payment payment, BigDecimal remaining) {
+        String content = "<h2>Partial Payment Received</h2>" +
+                "<p>Dear " + bill.getResident().getFullName() + ",</p>" +
+                "<p>We have received a partial payment for water invoice <strong>INV-" + bill.getId() + "</strong>.</p>" +
+                "<p><strong>Amount Paid:</strong> ₹" + payment.getAmount().setScale(2, java.math.RoundingMode.HALF_UP) + "</p>" +
+                "<p><strong>Remaining Outstanding:</strong> ₹" + remaining.setScale(2, java.math.RoundingMode.HALF_UP) + "</p>" +
+                "<p>Please pay the remaining balance before the due date to avoid late charges.</p>" +
+                "<a href='" + frontendBaseUrl + "/resident/dashboard' class='btn' style='color:#ffffff;'>Pay Outstanding Balance</a>";
+        sendHtmlEmail(bill.getResident().getEmail(), "Partial Payment Receipt - INV-" + bill.getId(), getBaseTemplate("Partial Payment", content), null, null);
+    }
+
+    public void sendRefundInitiatedEmail(Refund refund) {
+        String content = "<h2>Refund Request Initiated</h2>" +
+                "<p>Dear " + refund.getBill().getResident().getFullName() + ",</p>" +
+                "<p>A refund has been initiated for transaction <strong>" + refund.getPayment().getTransactionId() + "</strong> against water invoice <strong>INV-" + refund.getBill().getId() + "</strong>.</p>" +
+                "<p><strong>Refund Amount:</strong> ₹" + refund.getAmount().setScale(2, java.math.RoundingMode.HALF_UP) + "</p>" +
+                "<p><strong>Reason:</strong> " + refund.getReason() + "</p>" +
+                "<p>The request is currently pending administrative approval. You will receive an update once approved.</p>";
+        sendHtmlEmail(refund.getBill().getResident().getEmail(), "Refund Requested - " + refund.getRefundNumber(), getBaseTemplate("Refund Requested", content), null, null);
+    }
+
+    public void sendRefundApprovedEmail(Refund refund) {
+        String content = "<h2>Refund Approved and Processed</h2>" +
+                "<p>Dear " + refund.getBill().getResident().getFullName() + ",</p>" +
+                "<p>Good news! Your refund request <strong>" + refund.getRefundNumber() + "</strong> has been approved and processed.</p>" +
+                "<p><strong>Refund Amount:</strong> ₹" + refund.getAmount().setScale(2, java.math.RoundingMode.HALF_UP) + "</p>" +
+                "<p><strong>Status:</strong> <span class='badge'>APPROVED</span></p>" +
+                "<p>Please check your original payment method in 5-7 business days for the credit settlement.</p>";
+        sendHtmlEmail(refund.getBill().getResident().getEmail(), "Refund Processed - " + refund.getRefundNumber(), getBaseTemplate("Refund Processed", content), null, null);
+    }
+
+    public void sendPaymentDueReminderEmail(WaterBill bill, int daysOverdue) {
+        String content = "<h2>⚠️ Overdue Payment Reminder</h2>" +
+                "<p>Dear " + bill.getResident().getFullName() + ",</p>" +
+                "<p>This is a reminder that water invoice <strong>INV-" + bill.getId() + "</strong> is now <strong>" + daysOverdue + " days overdue</strong>.</p>" +
+                "<p><strong>Overdue Amount:</strong> ₹" + bill.getAmount().setScale(2, java.math.RoundingMode.HALF_UP) + "</p>" +
+                "<p><strong>Due Date:</strong> " + bill.getDueDate().toString() + "</p>" +
+                "<p>Please settle the dues immediately to prevent utility suspension or further late interest penalties.</p>" +
+                "<a href='" + frontendBaseUrl + "/resident/dashboard' class='btn' style='color:#ffffff;'>Pay Dues Now</a>";
+        sendHtmlEmail(bill.getResident().getEmail(), "Overdue Reminder: Invoice INV-" + bill.getId(), getBaseTemplate("Payment Due", content), null, null);
+    }
+
+    public void sendReceiptEmail(Receipt receipt, byte[] pdfBytes) {
+        String content = "<h2>Payment Receipt Generated</h2>" +
+                "<p>Dear " + receipt.getResident().getFullName() + ",</p>" +
+                "<p>Your payment receipt <strong>" + receipt.getReceiptNumber() + "</strong> has been generated successfully.</p>" +
+                "<p><strong>Receipt Number:</strong> " + receipt.getReceiptNumber() + "</p>" +
+                "<p><strong>Amount Paid:</strong> ₹" + receipt.getAmount().setScale(2, java.math.RoundingMode.HALF_UP) + "</p>" +
+                "<p><strong>Date Paid:</strong> " + receipt.getGeneratedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + "</p>" +
+                "<p>Please find the attached PDF payment receipt for your records.</p>";
+        
+        String attachmentName = "Receipt_" + receipt.getReceiptNumber() + ".pdf";
+        sendHtmlEmail(receipt.getResident().getEmail(), "Payment Receipt - " + receipt.getReceiptNumber(), getBaseTemplate("Payment Receipt", content), attachmentName, pdfBytes);
+    }
 }
+

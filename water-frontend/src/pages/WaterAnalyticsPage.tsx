@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Activity, Droplet, AlertTriangle, TrendingUp, Sparkles, Building, 
+  Activity, Droplet, AlertTriangle, TrendingUp, Building, 
   UserCheck, ShieldAlert, Zap, Calendar, RefreshCw 
 } from 'lucide-react';
 import { waterService, type ReadingsAnalytics } from '../services/waterService';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
-  Tooltip, BarChart, Bar, LineChart, Line, Legend 
+  Tooltip, BarChart, Bar, LineChart, Line 
 } from 'recharts';
 import { toast } from 'sonner';
 
@@ -19,7 +19,7 @@ export default function WaterAnalyticsPage() {
       setLoading(true);
       const data = await waterService.getReadingsAnalytics();
       setAnalytics(data);
-    } catch (err) {
+    } catch  {
       toast.error('Failed to load consumption analytics.');
     } finally {
       setLoading(false);

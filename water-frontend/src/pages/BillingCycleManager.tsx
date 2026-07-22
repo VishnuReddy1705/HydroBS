@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Calendar, Play, CheckCircle2, Archive, RotateCcw, 
-  Trash2, Layers, AlertCircle, Loader2, ArrowRight 
+  Trash2, Layers, Loader2, ArrowRight 
 } from 'lucide-react';
 import { billingService, type BillingCycle } from '../services/billingService';
 import { getCommunityId, getRole } from '@/lib/auth';
@@ -33,7 +33,7 @@ export default function BillingCycleManager() {
     try {
       const data = await billingService.getBillingCycles(communityId);
       setCycles(data);
-    } catch (e: any) {
+    } catch  {
       toast.error('Failed to load billing cycles');
     } finally {
       setLoading(false);
@@ -61,7 +61,7 @@ export default function BillingCycleManager() {
       setIsModalOpen(false);
       setForm({ name: '', startDate: '', endDate: '' });
       fetchCycles();
-    } catch (e: any) {
+    } catch  {
       toast.error('Failed to create cycle');
     } finally {
       setSubmitting(false);
@@ -94,7 +94,7 @@ export default function BillingCycleManager() {
       await billingService.deleteBillingCycle(id);
       toast.success('Billing cycle deleted');
       fetchCycles();
-    } catch (e: any) {
+    } catch  {
       toast.error('Failed to delete cycle');
     }
   };
@@ -121,28 +121,28 @@ export default function BillingCycleManager() {
   const getStatusStyle = (status: string) => {
     switch (status.toUpperCase()) {
       case 'OPEN':
-        return 'bg-zinc-800 text-zinc-300 border-zinc-700';
+        return 'bg-slate-100 text-slate-600 border-slate-200';
       case 'ACTIVE':
-        return 'bg-blue-500/10 text-blue-400 border-blue-500/25';
+        return 'bg-blue-50 text-blue-600 border-blue-100';
       case 'FINALIZED':
-        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25';
+        return 'bg-emerald-50 text-emerald-600 border-emerald-100';
       case 'ARCHIVED':
-        return 'bg-purple-500/10 text-purple-400 border-purple-500/25';
+        return 'bg-purple-50 text-purple-600 border-purple-100';
       default:
-        return 'bg-zinc-800 text-zinc-300 border-zinc-700';
+        return 'bg-slate-100 text-slate-600 border-slate-200';
     }
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 text-slate-800">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Billing Cycle Management</h1>
-          <p className="text-gray-400">Open, active, and finalize progressive water billing runs.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[#0F4C81]">Billing Cycle Management</h1>
+          <p className="text-slate-500 text-sm">Open, active, and finalize progressive water billing runs.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg shadow-lg hover:shadow-blue-500/20 transition"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl shadow-lg hover:shadow-blue-500/20 transition"
         >
           <Plus className="w-4 h-4" /> Create Cycle
         </button>
@@ -153,45 +153,45 @@ export default function BillingCycleManager() {
           <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
         </div>
       ) : cycles.length === 0 ? (
-        <div className="bg-zinc-900/30 border border-zinc-800 p-12 text-center rounded-2xl">
-          <Layers className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-white">No Billing Cycles</h3>
-          <p className="text-gray-500 mt-1 max-w-sm mx-auto">Create a billing cycle to begin tracking and generating community water bills.</p>
+        <div className="bg-white border border-slate-100 p-12 text-center rounded-3xl shadow-xs">
+          <Layers className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-slate-800">No Billing Cycles</h3>
+          <p className="text-slate-400 mt-1 max-w-sm mx-auto">Create a billing cycle to begin tracking and generating community water bills.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {cycles.map((cycle) => (
             <div 
               key={cycle.id}
-              className="bg-zinc-900/40 border border-zinc-800/80 p-6 rounded-2xl space-y-4 backdrop-blur-xl flex flex-col justify-between"
+              className="bg-white border border-slate-100 p-6 rounded-3xl shadow-xs space-y-4 flex flex-col justify-between"
             >
               <div className="space-y-3">
                 <div className="flex justify-between items-start">
-                  <h3 className="text-xl font-bold text-white tracking-tight">{cycle.name}</h3>
+                  <h3 className="text-xl font-bold text-[#0F4C81] tracking-tight">{cycle.name}</h3>
                   <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${getStatusStyle(cycle.status)}`}>
                     {cycle.status}
                   </span>
                 </div>
 
-                <div className="flex gap-4 text-xs text-gray-400">
+                <div className="flex gap-4 text-xs text-slate-500">
                   <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-zinc-500" />
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
                     <span>Start: {cycle.startDate}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <ArrowRight className="w-3.5 h-3.5 text-zinc-500" />
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
                     <span>End: {cycle.endDate}</span>
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="border-t border-zinc-800/60 pt-4 flex flex-wrap gap-2 justify-between items-center">
+              <div className="border-t border-slate-100 pt-4 flex flex-wrap gap-2 justify-between items-center">
                 <div className="flex gap-2">
                   {cycle.status === 'OPEN' && (
                     <button
                       onClick={() => handleTransition(cycle.id!, 'ACTIVE')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-md transition"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg transition"
                     >
                       <Play className="w-3 h-3" /> Activate Cycle
                     </button>
@@ -202,7 +202,7 @@ export default function BillingCycleManager() {
                       <button
                         onClick={() => triggerBillingRun(cycle.id!)}
                         disabled={billingRunningId === cycle.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-md transition disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-lg transition disabled:opacity-50"
                       >
                         {billingRunningId === cycle.id ? (
                           <Loader2 className="w-3 h-3 animate-spin" />
@@ -213,7 +213,7 @@ export default function BillingCycleManager() {
                       </button>
                       <button
                         onClick={() => handleTransition(cycle.id!, 'FINALIZED')}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-md transition"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg transition"
                       >
                         <CheckCircle2 className="w-3 h-3" /> Finalize
                       </button>
@@ -224,14 +224,14 @@ export default function BillingCycleManager() {
                     <>
                       <button
                         onClick={() => handleTransition(cycle.id!, 'ARCHIVED')}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium rounded-md transition"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium rounded-lg transition"
                       >
                         <Archive className="w-3 h-3" /> Archive
                       </button>
                       {role === 'ADMIN' && (
                         <button
                           onClick={() => handleReopen(cycle.id!)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium rounded-md border border-zinc-700 transition"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 transition"
                         >
                           <RotateCcw className="w-3 h-3" /> Reopen
                         </button>
@@ -242,7 +242,7 @@ export default function BillingCycleManager() {
                   {cycle.status === 'ARCHIVED' && role === 'ADMIN' && (
                     <button
                       onClick={() => handleReopen(cycle.id!)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium rounded-md border border-zinc-700 transition"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 transition"
                     >
                       <RotateCcw className="w-3 h-3" /> Reopen
                     </button>
@@ -252,7 +252,7 @@ export default function BillingCycleManager() {
                 {cycle.status === 'OPEN' && (
                   <button
                     onClick={() => handleDelete(cycle.id!)}
-                    className="text-red-500 hover:text-red-400 p-1.5 rounded hover:bg-red-500/10 transition"
+                    className="text-red-500 hover:text-red-600 p-1.5 rounded hover:bg-red-50 transition"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -265,45 +265,45 @@ export default function BillingCycleManager() {
 
       {/* Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-zinc-800 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-white">Create Billing Cycle</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-white transition">✕</button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-100 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-[#0F4C81]">Create Billing Cycle</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition">✕</button>
             </div>
             
             <form onSubmit={handleCreate} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-1">Cycle Name *</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Cycle Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. July 2026 Water Billing"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-zinc-700"
+                  className="w-full bg-slate-50/50 border border-slate-100 rounded-xl px-4 py-2.5 text-slate-800 text-xs font-semibold focus:outline-none focus:border-[#00B4D8]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-1">Start Date *</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Start Date *</label>
                 <input
                   type="date"
                   required
                   value={form.startDate}
                   onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-zinc-700"
+                  className="w-full bg-slate-50/50 border border-slate-100 rounded-xl px-4 py-2.5 text-slate-800 text-xs font-semibold focus:outline-none focus:border-[#00B4D8]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-1">End Date *</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1">End Date *</label>
                 <input
                   type="date"
                   required
                   value={form.endDate}
                   onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-zinc-700"
+                  className="w-full bg-slate-50/50 border border-slate-100 rounded-xl px-4 py-2.5 text-slate-800 text-xs font-semibold focus:outline-none focus:border-[#00B4D8]"
                 />
               </div>
 
@@ -311,14 +311,14 @@ export default function BillingCycleManager() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition text-sm"
+                  className="px-4 py-2 bg-slate-50 border border-slate-200/50 text-[#0F4C81] hover:bg-slate-100/80 rounded-xl transition text-xs font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition text-sm disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition text-xs disabled:opacity-50 shadow-md hover:shadow-blue-500/20"
                 >
                   {submitting && <Loader2 className="w-4 h-4 animate-spin" />} Create
                 </button>

@@ -87,6 +87,18 @@ public class Community {
     @Builder.Default
     private BigDecimal tariffRate = new BigDecimal("5.00");
 
+    @Column(name = "tier1_limit_litres", precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal tier1LimitLitres = new BigDecimal("10000.00");
+
+    @Column(name = "tier1_rate", precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal tier1Rate = new BigDecimal("5.00");
+
+    @Column(name = "tier2_rate", precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal tier2Rate = new BigDecimal("8.00");
+
     @Column(name = "tax_rate", nullable = false, precision = 5, scale = 2)
     @Builder.Default
     private BigDecimal taxRate = new BigDecimal("18.00");

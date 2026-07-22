@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -30,6 +31,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/profile")
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ResidentProfileController {
 
     private final UserRepository userRepository;
@@ -46,6 +48,7 @@ public class ResidentProfileController {
 
     @GetMapping("/me")
     @PreAuthorize("hasRole('RESIDENT')")
+    @Transactional(readOnly = true)
     public ResponseEntity<?> getMyProfile(Authentication authentication) {
         User resident = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Logged in resident not found"));
@@ -115,16 +118,32 @@ public class ResidentProfileController {
     // ===========================================
 
     @GetMapping("/family")
-    @PreAuthorize("hasRole('RESIDENT')")
-    public ResponseEntity<?> getMyFamily(Authentication authentication) {
-        User resident = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Logged in resident not found"));
+    @PreAuthorize("hasAnyRole('RESIDENT', 'ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<?> getMyFamily(
+            @RequestParam(required = false) Long residentId,
+            Authentication authentication
+    ) {
+        User caller = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
 
-        return ResponseEntity.ok(familyMemberRepository.findByResidentId(resident.getId()));
+        User targetResident = caller;
+        if (caller.getRole() != Role.RESIDENT && residentId != null) {
+            targetResident = userRepository.findById(residentId)
+                    .orElseThrow(() -> new RuntimeException("Resident not found"));
+            if (caller.getRole() == Role.ADMIN) {
+                if (caller.getCommunity() == null || targetResident.getCommunity() == null ||
+                        !caller.getCommunity().getId().equals(targetResident.getCommunity().getId())) {
+                    return ResponseEntity.status(403).body("Access Denied: Resident belongs to another community.");
+                }
+            }
+        }
+
+        return ResponseEntity.ok(familyMemberRepository.findByResidentId(targetResident.getId()));
     }
 
     @PostMapping("/family")
     @PreAuthorize("hasRole('RESIDENT')")
+    @Transactional
     public ResponseEntity<?> addFamilyMember(@RequestBody FamilyMemberRequest req, Authentication authentication) {
         User resident = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Logged in resident not found"));
@@ -145,6 +164,7 @@ public class ResidentProfileController {
 
     @PutMapping("/family/{id}")
     @PreAuthorize("hasRole('RESIDENT')")
+    @Transactional
     public ResponseEntity<?> editFamilyMember(@PathVariable Long id, @RequestBody FamilyMemberRequest req, Authentication authentication) {
         User resident = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Logged in resident not found"));
@@ -169,6 +189,7 @@ public class ResidentProfileController {
 
     @DeleteMapping("/family/{id}")
     @PreAuthorize("hasRole('RESIDENT')")
+    @Transactional
     public ResponseEntity<?> removeFamilyMember(@PathVariable Long id, Authentication authentication) {
         User resident = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Logged in resident not found"));
@@ -190,12 +211,27 @@ public class ResidentProfileController {
     // ===========================================
 
     @GetMapping("/documents")
-    @PreAuthorize("hasRole('RESIDENT')")
-    public ResponseEntity<?> getMyDocuments(Authentication authentication) {
-        User resident = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Logged in resident not found"));
+    @PreAuthorize("hasAnyRole('RESIDENT', 'ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<?> getMyDocuments(
+            @RequestParam(required = false) Long residentId,
+            Authentication authentication
+    ) {
+        User caller = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
 
-        List<DocumentResponse> list = documentRepository.findByResidentId(resident.getId()).stream()
+        User targetResident = caller;
+        if (caller.getRole() != Role.RESIDENT && residentId != null) {
+            targetResident = userRepository.findById(residentId)
+                    .orElseThrow(() -> new RuntimeException("Resident not found"));
+            if (caller.getRole() == Role.ADMIN) {
+                if (caller.getCommunity() == null || targetResident.getCommunity() == null ||
+                        !caller.getCommunity().getId().equals(targetResident.getCommunity().getId())) {
+                    return ResponseEntity.status(403).body("Access Denied: Resident belongs to another community.");
+                }
+            }
+        }
+
+        List<DocumentResponse> list = documentRepository.findByResidentId(targetResident.getId()).stream()
                 .map(this::mapToDocResponse)
                 .toList();
         return ResponseEntity.ok(list);
@@ -203,6 +239,7 @@ public class ResidentProfileController {
 
     @PostMapping(value = "/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('RESIDENT')")
+    @Transactional
     public ResponseEntity<?> uploadDocument(
             @RequestParam("file") MultipartFile file,
             @RequestParam("type") String documentType,
@@ -295,6 +332,7 @@ public class ResidentProfileController {
 
     @DeleteMapping("/documents/{id}")
     @PreAuthorize("hasRole('RESIDENT')")
+    @Transactional
     public ResponseEntity<?> deleteDocument(@PathVariable Long id, Authentication authentication) {
         User resident = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("Logged in resident not found"));
@@ -321,12 +359,27 @@ public class ResidentProfileController {
     // ===========================================
 
     @GetMapping("/timeline")
-    @PreAuthorize("hasRole('RESIDENT')")
-    public ResponseEntity<?> getMyTimeline(Authentication authentication) {
-        User resident = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("Logged in resident not found"));
+    @PreAuthorize("hasAnyRole('RESIDENT', 'ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<?> getMyTimeline(
+            @RequestParam(required = false) Long residentId,
+            Authentication authentication
+    ) {
+        User caller = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
 
-        List<AuditLog> logs = auditLogRepository.findByUserEmailOrderByCreatedAtDesc(resident.getEmail()).stream()
+        User targetResident = caller;
+        if (caller.getRole() != Role.RESIDENT && residentId != null) {
+            targetResident = userRepository.findById(residentId)
+                    .orElseThrow(() -> new RuntimeException("Resident not found"));
+            if (caller.getRole() == Role.ADMIN) {
+                if (caller.getCommunity() == null || targetResident.getCommunity() == null ||
+                        !caller.getCommunity().getId().equals(targetResident.getCommunity().getId())) {
+                    return ResponseEntity.status(403).body("Access Denied: Resident belongs to another community.");
+                }
+            }
+        }
+
+        List<AuditLog> logs = auditLogRepository.findByUserEmailOrderByCreatedAtDesc(targetResident.getEmail()).stream()
                 .limit(20)
                 .toList();
 

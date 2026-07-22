@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  DollarSign, Activity, TrendingUp, AlertTriangle, ArrowUpRight, 
+  Activity, TrendingUp, AlertTriangle, ArrowUpRight, 
   RotateCw, RefreshCw, BarChart2, CheckCircle2, ShieldAlert,
-  Building, Calendar, ArrowDownRight, Users
+  Building, Calendar, Users
 } from 'lucide-react';
 import { billingService } from '../services/billingService';
 import { getCommunityId, getRole } from '@/lib/auth';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, 
-  Tooltip, BarChart, Bar, Legend, Cell 
+  Tooltip, BarChart, Bar, Legend 
 } from 'recharts';
 import { toast } from 'sonner';
 
@@ -35,7 +35,7 @@ export default function BillingDashboard() {
         res = await billingService.getAnalytics(communityId);
       }
       setData(res);
-    } catch (err: any) {
+    } catch  {
       toast.error('Failed to load billing analytics dashboards');
     } finally {
       setLoading(false);
@@ -85,7 +85,7 @@ export default function BillingDashboard() {
         
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={fetchData}
+            onClick={fetchAnalytics}
             className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-[#0F4C81] hover:text-[#00B4D8] bg-slate-50 border border-slate-200/50 rounded-xl hover:bg-slate-100/80 transition-all cursor-pointer shadow-xs"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -138,7 +138,12 @@ export default function BillingDashboard() {
                   <Activity className="h-4 w-4" />
                 </span>
               </div>
-              <div className="mt-4 text-2xl font-black text-white">88.4%</div>
+              <div className="mt-4 text-2xl font-black text-white">
+                {(() => {
+                  const total = (data.totalRevenue || 0) + (data.totalOutstanding || 0);
+                  return total > 0 ? `${((data.totalRevenue || 0) / total * 100).toFixed(1)}%` : '0%';
+                })()}
+              </div>
               <p className="mt-1 text-xs text-slate-500">Collection cycle average efficiency</p>
             </div>
           </div>

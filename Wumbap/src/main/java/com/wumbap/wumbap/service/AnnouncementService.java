@@ -17,6 +17,21 @@ public class AnnouncementService {
     private final AnnouncementRepository announcementRepository;
 
     public Announcement createAnnouncement(String title, String content, User author, Community community, LocalDateTime expiryDate) {
+        return createAnnouncement(title, content, author, community, expiryDate, "NORMAL", "Entire Community", null, null, null);
+    }
+
+    public Announcement createAnnouncement(
+            String title, 
+            String content, 
+            User author, 
+            Community community, 
+            LocalDateTime expiryDate,
+            String priority,
+            String audience,
+            String targetBuildings,
+            String targetFlats,
+            String targetResidents
+    ) {
         Announcement announcement = Announcement.builder()
                 .title(title)
                 .content(content)
@@ -24,6 +39,11 @@ public class AnnouncementService {
                 .community(community)
                 .publishDate(LocalDateTime.now())
                 .expiryDate(expiryDate)
+                .priority(priority != null ? priority : "NORMAL")
+                .audience(audience != null ? audience : "Entire Community")
+                .targetBuildings(targetBuildings)
+                .targetFlats(targetFlats)
+                .targetResidents(targetResidents)
                 .isArchived(false)
                 .build();
         return announcementRepository.save(announcement);

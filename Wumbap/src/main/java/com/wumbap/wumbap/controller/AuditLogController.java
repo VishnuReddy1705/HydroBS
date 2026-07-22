@@ -22,17 +22,20 @@ public class AuditLogController {
     @GetMapping
     public ResponseEntity<?> getAuditLogs(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String search) {
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String actionType) {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<AuditLog> auditLogs;
 
-        if (search != null && !search.trim().isEmpty()) {
-            // Simple filter by userEmail or actionType or details
-            // For now, since we have standard JpaRepository, we can do client side filter or simple findAll.
-            // Let's implement a simple page request
-            auditLogs = auditLogRepository.findAll(pageable);
+        if (actionType != null && !actionType.trim().isEmpty()) {
+            auditLogs = auditLogRepository.findByActionTypeContainingIgnoreCase(actionType.trim(), pageable);
+        } else if (search != null && !search.trim().isEmpty()) {
+            String searchTerm = search.trim();
+            auditLogs = auditLogRepository.findByUserEmailContainingIgnoreCaseOrActionTypeContainingIgnoreCaseOrDetailsContainingIgnoreCase(
+                    searchTerm, searchTerm, searchTerm, pageable
+            );
         } else {
             auditLogs = auditLogRepository.findAll(pageable);
         }

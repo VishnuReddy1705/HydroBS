@@ -3,10 +3,10 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "../components/DashboardLayout";
 import { api } from "@/lib/axios";
 import { getErrorMessage } from "../utils/error";
-import { 
-  Loader2, Building2, Users, Droplets, AlertOctagon, TrendingUp, 
-  BarChart3, PieChart as PieIcon, ArrowRight, Settings, Info, DollarSign, 
-  Plus, Edit, Trash2, Shield, Power, ToggleLeft, ToggleRight, Search, X, Eye
+import {
+  Building2, Users, Droplets, AlertOctagon, TrendingUp,
+  BarChart3, PieChart as PieIcon, ArrowRight, Info, DollarSign,
+  Plus, Edit, Trash2, Power, ToggleRight, Search, X, Eye, ArrowLeft
 } from "lucide-react";
 import { 
   ResponsiveContainer, BarChart, Bar, 
@@ -15,8 +15,13 @@ import {
 } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { CardSkeleton, ChartSkeleton, TableSkeleton, ActivitySkeleton } from "../components/ui/Skeletons";
+import { CardSkeleton, ChartSkeleton, TableSkeleton } from "../components/ui/Skeletons";
 import { AnimatedCounter } from "../components/ui/AnimatedCounter";
+import ReportsPage from "./ReportsPage";
+import ResidentDetails from "./ResidentDetails";
+import SystemHealthDashboard from "./SystemHealthDashboard";
+import AuditLogViewer from "./AuditLogViewer";
+import AnnouncementCenter from "./AnnouncementCenter";
 
 const COLORS = ["#00B4D8", "#0F4C81", "#2ECC71", "#FFB703", "#EC4899", "#8B5CF6"];
 const TOOLTIP_STYLE = { 
@@ -36,6 +41,7 @@ export default function SuperAdminDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("ALL");
 
   // Community Modal States
   const [showCommModal, setShowCommModal] = useState(false);
@@ -96,7 +102,7 @@ export default function SuperAdminDashboard() {
       const res = await api.get("/api/dashboard/super-admin");
       setStats(res.data);
       toast.success("Dashboard data updated successfully.");
-    } catch (err) {
+    } catch  {
       toast.error("Failed to refresh dashboard.");
     } finally {
       setIsRefreshing(false);
@@ -111,6 +117,15 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     fetchStats();
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.get("/api/dashboard/super-admin");
+        setStats(res.data);
+      } catch (err) {
+        console.error("Auto refresh stats failed:", err);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const openCommModal = (comm: any = null) => {
@@ -289,7 +304,7 @@ export default function SuperAdminDashboard() {
       await api.post(`/api/super-admin/users/${id}/toggle-active`);
       toast.success("User active status toggled successfully.");
       fetchStats();
-    } catch (err) {
+    } catch  {
       toast.error("Failed to change user status.");
     }
   };
@@ -302,7 +317,7 @@ export default function SuperAdminDashboard() {
       await api.delete(`/api/super-admin/users/${id}`);
       toast.success("User account deleted successfully.");
       fetchStats();
-    } catch (err) {
+    } catch  {
       toast.error("Failed to delete user.");
     }
   };
@@ -329,6 +344,23 @@ export default function SuperAdminDashboard() {
   const monthlyRevenueData = stats?.monthlyRevenueData || [];
   const paymentStatusData = stats?.paymentStatusData || [];
 
+  const filteredUsers = allUsersList.filter((u: any) => {
+    const search = searchQuery.toLowerCase();
+    const matchesSearch =
+      (u.fullName || "").toLowerCase().includes(search) ||
+      (u.email || "").toLowerCase().includes(search) ||
+      (u.role || "").toLowerCase().includes(search) ||
+      (u.communityName || "").toLowerCase().includes(search) ||
+      (u.flatNumber || "").toLowerCase().includes(search);
+
+    const matchesRole =
+      userRoleFilter === "ALL" ||
+      (userRoleFilter === "COMMUNITY_ADMIN" && (u.role === "ADMIN" || u.role === "COMMUNITY_ADMIN")) ||
+      u.role === userRoleFilter;
+
+    return matchesSearch && matchesRole;
+  });
+
   const getTabTitle = () => {
     switch (currentTab) {
       case "communities":
@@ -337,6 +369,10 @@ export default function SuperAdminDashboard() {
         return "Users Directory";
       case "reports":
         return "System Analytics & Audits";
+      case "audit-logs":
+        return "Platform Audit Trails";
+      case "system-health":
+        return "System Health";
       case "settings":
         return "Global Settings";
       default:
@@ -541,9 +577,9 @@ export default function SuperAdminDashboard() {
                       Recent Import Failures
                     </h3>
                   </div>
-                  <div className="overflow-x-auto flex-1 custom-scrollbar">
+                  <div className="overflow-x-auto flex-1 custom-scrollbar max-h-[220px]">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-100">
+                      <thead className="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-100 sticky top-0">
                         <tr>
                           <th className="px-5 py-3">Row</th>
                           <th className="px-5 py-3">Identifier</th>
@@ -570,6 +606,51 @@ export default function SuperAdminDashboard() {
                 </div>
               </>
             )}
+          </div>
+
+          {/* Quick Operations & System Activity Banner */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+            <div className="clay-card p-6 border border-slate-100 bg-gradient-to-br from-[#0F4C81] to-[#0B3A63] text-white flex items-center justify-between shadow-md">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#00B4D8]">System Operations</span>
+                <h4 className="text-lg font-extrabold text-white">Communities Management</h4>
+                <p className="text-xs text-slate-300">View and configure parameters for all {communities.length} registered communities.</p>
+              </div>
+              <button 
+                onClick={() => setSearchParams({ tab: "communities" })}
+                className="px-4 py-2.5 bg-[#00B4D8] hover:bg-[#48CAE4] text-white font-extrabold text-xs rounded-xl shadow-sm transition-all cursor-pointer whitespace-nowrap"
+              >
+                Manage
+              </button>
+            </div>
+
+            <div className="clay-card p-6 border border-slate-100 bg-gradient-to-br from-emerald-700 to-teal-800 text-white flex items-center justify-between shadow-md">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Telemetry & Maintenance</span>
+                <h4 className="text-lg font-extrabold text-white">System Telemetry & Health</h4>
+                <p className="text-xs text-emerald-100">Monitor API response latency, database pools, JVM memory, and CPU load.</p>
+              </div>
+              <button 
+                onClick={() => setSearchParams({ tab: "system-health" })}
+                className="px-4 py-2.5 bg-emerald-400 hover:bg-emerald-300 text-slate-900 font-extrabold text-xs rounded-xl shadow-sm transition-all cursor-pointer whitespace-nowrap"
+              >
+                Health Check
+              </button>
+            </div>
+
+            <div className="clay-card p-6 border border-slate-100 bg-gradient-to-br from-purple-700 to-indigo-900 text-white flex items-center justify-between shadow-md">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-purple-300">Security & Audits</span>
+                <h4 className="text-lg font-extrabold text-white">Platform Audit Trails</h4>
+                <p className="text-xs text-purple-100">Inspect security logs, administrator actions, and access telemetry history.</p>
+              </div>
+              <button 
+                onClick={() => setSearchParams({ tab: "audit-logs" })}
+                className="px-4 py-2.5 bg-purple-400 hover:bg-purple-300 text-slate-900 font-extrabold text-xs rounded-xl shadow-sm transition-all cursor-pointer whitespace-nowrap"
+              >
+                Audit Trails
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -717,18 +798,30 @@ export default function SuperAdminDashboard() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-            <div className="relative w-full max-w-md">
-              <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search users by name, email, flat, or role..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 hover:bg-slate-100/80 border border-transparent focus:border-slate-100 focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 transition-all font-medium"
-              />
+            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-3xl">
+              <div className="relative w-full max-w-md">
+                <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search users by name, email, flat, or role..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-50 hover:bg-slate-100/80 border border-transparent focus:border-slate-100 focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 transition-all font-medium"
+                />
+              </div>
+              <select
+                value={userRoleFilter}
+                onChange={(e) => setUserRoleFilter(e.target.value)}
+                className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 transition-all cursor-pointer min-w-[190px]"
+              >
+                <option value="ALL">All Roles</option>
+                <option value="RESIDENT">Residents</option>
+                <option value="COMMUNITY_ADMIN">Community Admins</option>
+                <option value="SUPER_ADMIN">Super Admins</option>
+              </select>
             </div>
             <div className="px-4 py-2 rounded-xl bg-slate-50 border border-slate-100 text-xs font-bold text-slate-600">
-              Total Users: {totalUsers}
+              Showing: {filteredUsers.length} / {totalUsers}
             </div>
           </div>
 
@@ -750,22 +843,8 @@ export default function SuperAdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
-                {allUsersList.filter((u: any) => 
-                  u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  u.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  u.communityName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  u.flatNumber.toLowerCase().includes(searchQuery.toLowerCase())
-                ).length > 0 ? (
-                  allUsersList
-                    .filter((u: any) => 
-                      u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      u.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      u.communityName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      u.flatNumber.toLowerCase().includes(searchQuery.toLowerCase())
-                    )
-                    .map((u: any) => (
+                {filteredUsers.length > 0 ? (
+                  filteredUsers.map((u: any) => (
                       <tr key={u.id} className="hover:bg-slate-50/50">
                         <td className="px-5 py-4 font-bold text-[#0F4C81]">#{u.id}</td>
                         <td className="px-5 py-4 font-bold text-slate-800">{u.fullName}</td>
@@ -774,7 +853,7 @@ export default function SuperAdminDashboard() {
                           <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
                             u.role === "SUPER_ADMIN" 
                               ? "bg-rose-50 text-rose-600 border border-rose-100" 
-                              : u.role === "ADMIN"
+                              : u.role === "ADMIN" || u.role === "COMMUNITY_ADMIN"
                               ? "bg-cyan-50 text-[#0F4C81] border border-cyan-100"
                               : "bg-emerald-50 text-emerald-600 border border-emerald-100"
                           }`}>
@@ -798,8 +877,8 @@ export default function SuperAdminDashboard() {
                         </td>
                         <td className="px-5 py-4 text-right flex justify-end gap-2">
                           {u.role === "RESIDENT" && (
-                            <button 
-                              onClick={() => navigate(`/super-admin/residents/${u.id}`)}
+                            <button
+                              onClick={() => setSearchParams({ tab: "users", id: u.id.toString() })}
                               className="p-1.5 hover:bg-slate-100 rounded-lg text-[#0F4C81] transition-all cursor-pointer"
                               title="View Resident Profile"
                             >
@@ -835,66 +914,37 @@ export default function SuperAdminDashboard() {
         </div>
       )}
 
-      {/* Reports Tab */}
-      {currentTab === "reports" && (
-        <div className="border border-slate-100 rounded-3xl bg-white p-6 space-y-6 animate-fade-in shadow-sm">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-            <div>
-              <h3 className="text-lg font-bold text-[#0F4C81]">Platform Reports & Analytics</h3>
-              <p className="text-xs text-slate-500">Comprehensive metrics of revenue, usage, and payments</p>
-            </div>
-            <button onClick={() => setSearchParams({})} className="text-xs font-bold text-[#00B4D8] hover:underline cursor-pointer">Back to Dashboard</button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Revenue Analytics */}
-            <div className="border border-slate-100 rounded-2xl bg-slate-50/50 p-5 space-y-4">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">System Revenue Analytics (Paid vs Outstanding)</h4>
-              <div className="h-[250px] w-full">
-                {monthlyRevenueData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyRevenueData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                      <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
-                      <Tooltip contentStyle={TOOLTIP_STYLE} />
-                      <Bar dataKey="revenue" fill="#2ECC71" radius={[4, 4, 0, 0]} name="Revenue" />
-                      <Bar dataKey="outstanding" fill="#FFB703" radius={[4, 4, 0, 0]} name="Outstanding" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center text-slate-400 text-xs">No revenue data.</div>
-                )}
-              </div>
-            </div>
-
-            {/* Payment Distribution */}
-            <div className="border border-slate-100 rounded-2xl bg-slate-50/50 p-5 space-y-4 flex flex-col justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">System Bill Payments Ratio</h4>
-              <div className="h-[200px] w-full flex items-center justify-center relative">
-                {paymentStatusData.length > 0 && (paymentStatusData[0].value > 0 || paymentStatusData[1]?.value > 0) ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={paymentStatusData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={4} dataKey="value">
-                        {paymentStatusData.map((_: any, idx: number) => (
-                          <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="text-slate-400 text-xs">No billing metrics logged.</div>
-                )}
-              </div>
-              <div className="flex justify-center gap-5 text-[10px] text-slate-500 font-bold">
-                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#2ECC71]"></span>Paid</span>
-                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#FFB703]"></span>Outstanding</span>
-              </div>
-            </div>
-          </div>
+      {/* RESIDENT DETAILS VIEW (from users tab) */}
+      {currentTab === "users" && searchParams.get("id") && (
+        <div className="space-y-4 animate-fade-in">
+          <button
+            onClick={() => setSearchParams({ tab: "users" })}
+            className="flex items-center gap-2 text-[#0F4C81] hover:text-[#00B4D8] text-sm font-bold transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to Users List
+          </button>
+          <ResidentDetails id={searchParams.get("id")!} isTab={true} />
         </div>
       )}
+
+      {currentTab === "audit-logs" && (
+        <div className="space-y-6 animate-fade-in text-[#1F2937]">
+          <AuditLogViewer />
+        </div>
+      )}
+
+      {currentTab === "system-health" && (
+        <div className="space-y-6 animate-fade-in text-[#1F2937]">
+          <SystemHealthDashboard />
+        </div>
+      )}
+
+      {currentTab === "announcements" && (
+        <div className="space-y-6 animate-fade-in text-[#1F2937]">
+          <AnnouncementCenter />
+        </div>
+      )}
+
       {/* Visualizations Tab */}
       {currentTab === "visualizations" && (
         <motion.div 

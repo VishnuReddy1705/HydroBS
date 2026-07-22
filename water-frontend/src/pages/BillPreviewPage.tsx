@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  FileText, ArrowLeft, Printer, Download, Mail, CheckCircle, 
-  RotateCw, RefreshCw, AlertTriangle, ShieldAlert, Award, FileSpreadsheet 
+  ArrowLeft, Printer, Download, CheckCircle, 
+  RotateCw, RefreshCw, AlertTriangle, Award 
 } from 'lucide-react';
 import { billingService, type Bill } from '../services/billingService';
 import { toast } from 'sonner';
@@ -25,7 +25,7 @@ export default function BillPreviewPage({ id: propId }: { id?: string }) {
       setLoading(true);
       const data = await billingService.getBillDetails(Number(id));
       setBill(data);
-    } catch (err: any) {
+    } catch  {
       toast.error('Failed to load bill details');
     } finally {
       setLoading(false);
@@ -134,6 +134,9 @@ export default function BillPreviewPage({ id: propId }: { id?: string }) {
                 <div>Invoice No: <span className="font-semibold text-slate-200 print:text-black">{bill.invoiceNumber}</span></div>
                 <div>Bill Ref: <span className="font-semibold text-slate-200 print:text-black">{bill.billNumber}</span></div>
                 <div>Billing Month: <span className="font-semibold text-slate-200 print:text-black">{bill.billingMonth.substring(0, 7)}</span></div>
+                {bill.billingStartDate && bill.billingEndDate && (
+                  <div>Billing Period: <span className="font-semibold text-slate-200 print:text-black">{bill.billingStartDate} to {bill.billingEndDate}</span></div>
+                )}
                 <div>Status: <span className={`font-bold uppercase ${bill.status === 'PAID' ? 'text-emerald-400 print:text-emerald-600' : 'text-amber-400 print:text-amber-600'}`}>{bill.status}</span></div>
               </div>
             </div>

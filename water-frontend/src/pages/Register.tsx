@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Building2, Loader2, ArrowLeft, Droplet, User, Mail, Lock, 
-  Smartphone, Building, CheckCircle2, ChevronRight, UserCheck
+  Building, ChevronRight
 } from "lucide-react"
 import { api } from "@/lib/axios"
 import { saveSession } from "@/lib/auth"
@@ -126,7 +126,7 @@ export default function Register() {
           await api.post(`/api/communities/${selectedCommunityId}/join-request`)
           toast.success("Registration and community join request submitted successfully!")
           navigate("/resident/dashboard")
-        } catch (err) {
+        } catch  {
           logErrorAndLoginFallback()
         }
       }

@@ -186,21 +186,6 @@ export default function TopNavbar({ title, subtitle, onRefresh, isRefreshing }: 
         </div>
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-extrabold tracking-tight text-[#0F4C81] dark:text-[#00B4D8]">{title}</h1>
-          {/* Hidden as requested - refresh buttons are now integrated within navigated panels */}
-          {false && onRefresh && (
-            <button
-              onClick={() => {
-                fetchProfile();
-                fetchNotifications();
-                onRefresh();
-              }}
-              disabled={isRefreshing}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-[#0F4C81] hover:text-[#00B4D8] disabled:opacity-50 disabled:cursor-not-allowed bg-slate-50 border border-slate-200/50 rounded-xl hover:bg-slate-100/80 transition-all cursor-pointer shadow-xs"
-            >
-              <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-            </button>
-          )}
         </div>
         {subtitle && (
           <div className="flex items-center gap-1.5 mt-0.5">

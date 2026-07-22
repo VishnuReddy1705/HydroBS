@@ -45,6 +45,12 @@ public class WaterBill {
     @Column(name = "billing_month", nullable = false)
     private LocalDate billingMonth;
 
+    @Column(name = "billing_start_date")
+    private LocalDate billingStartDate;
+
+    @Column(name = "billing_end_date")
+    private LocalDate billingEndDate;
+
     @Column(name = "total_usage", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalUsage;
 

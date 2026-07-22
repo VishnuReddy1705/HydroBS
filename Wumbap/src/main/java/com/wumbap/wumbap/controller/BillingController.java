@@ -25,9 +25,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @RestController
 @RequestMapping("/api/billing")
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 @Slf4j
 public class BillingController {
 
@@ -39,6 +42,7 @@ public class BillingController {
 
     @PostMapping("/generate")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional
     public ResponseEntity<List<BillResponse>> generateBills(
             @RequestBody BillGenerationRequest request,
             Authentication authentication) {
@@ -61,6 +65,7 @@ public class BillingController {
 
     @PostMapping("/{billId}/revise")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional
     public ResponseEntity<BillResponse> reviseBill(
             @PathVariable Long billId,
             @RequestBody BillRevisionRequest request,

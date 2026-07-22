@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Volume2, Calendar, Archive, Plus, Trash2, Send, Clock, Globe, ShieldAlert, RefreshCw } from 'lucide-react';
+import { Volume2, Archive, Plus, Send, Clock, Globe, RefreshCw } from 'lucide-react';
 import api from '@/api';
+import { getRole } from '@/lib/auth';
 import { toast } from 'sonner';
 
 interface AnnouncementItem {
@@ -23,7 +24,7 @@ export default function AnnouncementCenter() {
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
   const [communities, setCommunities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<string>('');
+  const [userRole, setUserRole] = useState<string>(getRole() || '');
   
   // Form State
   const [showAddForm, setShowAddForm] = useState(false);
@@ -47,7 +48,7 @@ export default function AnnouncementCenter() {
         const commsRes = await api.get('/api/super-admin/communities');
         setCommunities(commsRes.data || []);
       }
-    } catch (err) {
+    } catch  {
       toast.error('Failed to load announcements');
     } finally {
       setLoading(false);
@@ -84,7 +85,7 @@ export default function AnnouncementCenter() {
       setContent('');
       setCommunityId('');
       fetchAnnouncements();
-    } catch (err) {
+    } catch  {
       toast.error('Failed to broadcast announcement');
     } finally {
       setSubmitting(false);
@@ -96,7 +97,7 @@ export default function AnnouncementCenter() {
       await api.post(`/api/announcements/${id}/archive`);
       setAnnouncements(prev => prev.filter(a => a.id !== id));
       toast.success('Announcement archived');
-    } catch (err) {
+    } catch  {
       toast.error('Failed to archive announcement');
     }
   };

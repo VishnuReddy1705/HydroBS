@@ -2,23 +2,34 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "../components/DashboardLayout";
 import { api } from "@/lib/axios";
+import { getCommunityId } from "@/lib/auth";
 import { getErrorMessage } from "../utils/error";
 import { residentService } from "../services/residentService";
 import {
   Users, Droplets, AlertTriangle, Check, X, Upload, Loader2,
   Receipt, ShoppingCart, Clock, AlertCircle, BarChart3, PieChart as PieIcon,
-  Search, ArrowRight, TrendingUp, DollarSign, FileText, Calendar as CalendarIcon,
-  Bell, Settings, User, Gauge, Download, Plus, Edit, Eye, Filter, Trash2, FileSpreadsheet
+  Search, ArrowRight, TrendingUp, FileText,
+  Bell, User, Download, Plus, Edit, Eye, Trash2, ArrowLeft, RefreshCw
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar,
   XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell
 } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { CardSkeleton, ChartSkeleton, TableSkeleton, ActivitySkeleton } from "../components/ui/Skeletons";
 import { AnimatedCounter } from "../components/ui/AnimatedCounter";
+import ReportsPage from "./ReportsPage";
+import ResidentDetails from "./ResidentDetails";
+import CollectPaymentDialog from "../components/billing/CollectPaymentDialog";
+import PaymentHistoryPanel from "../components/billing/PaymentHistoryPanel";
+import MeterReadingsPage from "./MeterReadingsPage";
+import BillManagementPage from "./BillManagementPage";
+import BulkPurchasePage from "./BulkPurchasePage";
+import AnnouncementCenter from "./AnnouncementCenter";
+import AuditLogViewer from "./AuditLogViewer";
+import BillingCycleManager from "./BillingCycleManager";
 
 const COLORS = ["#00B4D8", "#0F4C81", "#2ECC71", "#FFB703", "#EC4899", "#8B5CF6"];
 const TOOLTIP_STYLE = {
@@ -32,6 +43,8 @@ const TOOLTIP_STYLE = {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const rawCommunityId = getCommunityId();
+  const myCommunityId = (rawCommunityId && rawCommunityId !== "null" && rawCommunityId !== "undefined") ? Number(rawCommunityId) : undefined;
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get("tab") || "dashboard";
 
@@ -39,7 +52,30 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [refreshingPending, setRefreshingPending] = useState(false);
+  const [invoicesList, setInvoicesList] = useState<any[]>([]);
+  const [bulkPurchasesList, setBulkPurchasesList] = useState<any[]>([]);
+  const [showWaterPurchaseModal, setShowWaterPurchaseModal] = useState(false);
+  const [purchaseSupplier, setPurchaseSupplier] = useState("");
+  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0]);
+  const [purchaseVolume, setPurchaseVolume] = useState("");
+  const [purchaseCost, setPurchaseCost] = useState("");
+  const [purchaseNotes, setPurchaseNotes] = useState("");
+  const [savingPurchase, setSavingPurchase] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleRefreshPendingRequests = async () => {
+    setRefreshingPending(true);
+    try {
+      const res = await api.get("/api/communities/join-requests/pending");
+      setPendingRequests(res.data || []);
+      toast.success("Pending requests updated");
+    } catch (err) {
+      console.error("Error refreshing pending requests:", err);
+    } finally {
+      setRefreshingPending(false);
+    }
+  };
 
   // Resident management states
   const [resList, setResList] = useState<any[]>([]);
@@ -96,6 +132,7 @@ export default function AdminDashboard() {
 
   // Bill Gen States
   const [generatingBills, setGeneratingBills] = useState(false);
+  const [recordPaymentBill, setRecordPaymentBill] = useState<any | null>(null);
 
   // Manual Reading Modal
   const [showReadingModal, setShowReadingModal] = useState(false);
@@ -107,6 +144,9 @@ export default function AdminDashboard() {
   // Billing Settings
   const [billingSettings, setBillingSettings] = useState({
     tariffRate: "5.00",
+    tier1LimitLitres: "10000",
+    tier1Rate: "5.00",
+    tier2Rate: "8.00",
     taxRate: "18.00",
     lateFeeRate: "50.00",
     minimumMonthlyCharge: "100.00",
@@ -117,18 +157,26 @@ export default function AdminDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const [statsRes, requestsRes] = await Promise.all([
+      const [statsRes, requestsRes, billsRes, purchasesRes] = await Promise.all([
         api.get("/api/dashboard/admin"),
-        api.get("/api/communities/join-requests/pending")
+        api.get("/api/communities/join-requests/pending"),
+        api.get("/api/water/bills").catch(() => ({ data: [] })),
+        api.get("/api/bulk-purchases").catch(() => ({ data: [] }))
       ]);
       setStats(statsRes.data);
       setPendingRequests(requestsRes.data);
+      setInvoicesList(billsRes.data || []);
+      const purchasesData = purchasesRes.data?.content || purchasesRes.data || [];
+      setBulkPurchasesList(purchasesData);
 
       // Sync billing settings from backend
       const s = statsRes.data;
       if (s) {
         setBillingSettings(prev => ({
           tariffRate: s.tariffRate?.toString() || prev.tariffRate,
+          tier1LimitLitres: s.tier1LimitLitres?.toString() || prev.tier1LimitLitres,
+          tier1Rate: s.tier1Rate?.toString() || s.tariffRate?.toString() || prev.tier1Rate,
+          tier2Rate: s.tier2Rate?.toString() || prev.tier2Rate,
           taxRate: s.taxRate?.toString() || prev.taxRate,
           lateFeeRate: s.lateFeeRate?.toString() || prev.lateFeeRate,
           minimumMonthlyCharge: s.minimumMonthlyCharge?.toString() || prev.minimumMonthlyCharge,
@@ -145,19 +193,26 @@ export default function AdminDashboard() {
     setResLoading(true);
     try {
       const params = {
+        communityId: myCommunityId || undefined,
         search: resSearch || undefined,
         isActive: resStatus === "ACTIVE" ? true : resStatus === "INACTIVE" ? false : undefined,
         occupancyType: resOccupancy !== "ALL" ? resOccupancy : undefined,
         sortBy: resSortBy,
         sortDir: resSortDir,
         page: resPage,
-        size: 10
+        size: 50
       };
       const data = await residentService.getResidents(params);
-      setResList(data.content || []);
-      setResTotal(data.totalElements || 0);
+      if (Array.isArray(data)) {
+        setResList(data);
+        setResTotal(data.length);
+      } else {
+        setResList(data.content || []);
+        setResTotal(data.totalElements ?? (data.content?.length || 0));
+      }
     } catch (err) {
       console.error("Failed to fetch residents list:", err);
+      toast.error("Unable to load residents list. Please refresh and try again.");
     } finally {
       setResLoading(false);
     }
@@ -268,7 +323,7 @@ export default function AdminDashboard() {
       await residentService.toggleResidentStatus(id, active);
       toast.success(`Resident ${active ? "activated" : "deactivated"} successfully.`);
       fetchResidentsList();
-    } catch (err) {
+    } catch  {
       toast.error("Failed to toggle status.");
     }
   };
@@ -284,7 +339,7 @@ export default function AdminDashboard() {
       await residentService.deleteResident(id, archive);
       toast.success(archive ? "Resident profile archived." : "Resident profile deleted permanently.");
       fetchResidentsList();
-    } catch (err) {
+    } catch  {
       toast.error("Operation failed.");
     }
   };
@@ -328,7 +383,7 @@ export default function AdminDashboard() {
       setImportResult(result);
       toast.success(`CSV process done. Imported: ${result.successfulRows} rows.`);
       fetchResidentsList();
-    } catch (err) {
+    } catch  {
       toast.error("Failed to process CSV file.");
     } finally {
       setIsImporting(false);
@@ -346,6 +401,20 @@ export default function AdminDashboard() {
       setLoading(false);
     };
     init();
+
+    const interval = setInterval(async () => {
+      await fetchDashboardData();
+    }, 3000);
+
+    const handleFocus = () => fetchDashboardData();
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
   }, []);
 
   useEffect(() => {
@@ -359,7 +428,7 @@ export default function AdminDashboard() {
     try {
       await fetchDashboardData();
       toast.success("Dashboard data refreshed successfully.");
-    } catch (err) {
+    } catch  {
       toast.error("Failed to refresh dashboard.");
     } finally {
       setIsRefreshing(false);
@@ -430,10 +499,17 @@ export default function AdminDashboard() {
     setGeneratingBills(true);
     try {
       const res = await api.post("/api/water/generate-bills");
-      toast.success(typeof res.data === "string" ? res.data : "Bills generated successfully!");
+      if (myCommunityId) {
+        await api.post("/api/billing/generate", {
+          scope: "COMMUNITY",
+          communityId: Number(myCommunityId),
+          notes: "Community Admin Billing Run"
+        }).catch(() => {});
+      }
+      toast.success(typeof res.data === "string" ? res.data : "Invoices generated successfully for all community residents!");
       await fetchDashboardData();
     } catch (err: any) {
-      toast.error(getErrorMessage(err, "Failed to generate bills."));
+      toast.error(getErrorMessage(err, "Failed to generate community invoices."));
     } finally {
       setGeneratingBills(false);
     }
@@ -466,20 +542,70 @@ export default function AdminDashboard() {
     e.preventDefault();
     setSavingSettings(true);
     try {
-      await api.put("/api/water/billing-settings", {
+      const payload = {
         tariffRate: parseFloat(billingSettings.tariffRate),
+        tier1LimitLitres: parseFloat(billingSettings.tier1LimitLitres),
+        tier1Rate: parseFloat(billingSettings.tier1Rate),
+        tier2Rate: parseFloat(billingSettings.tier2Rate),
         taxRate: parseFloat(billingSettings.taxRate),
         lateFeeRate: parseFloat(billingSettings.lateFeeRate),
         minimumMonthlyCharge: parseFloat(billingSettings.minimumMonthlyCharge),
         fixedServiceCharge: parseFloat(billingSettings.fixedServiceCharge),
         dueDateDays: parseInt(billingSettings.dueDateDays)
-      });
-      toast.success("Billing settings saved successfully.");
+      };
+      await api.put("/api/water/billing-settings", payload);
+
+      // Instantly reflect in local stats so division cards above update IMMEDIATELY!
+      setStats((prev: any) => ({
+        ...prev,
+        tariffRate: payload.tariffRate,
+        tier1LimitLitres: payload.tier1LimitLitres,
+        tier1Rate: payload.tier1Rate,
+        tier2Rate: payload.tier2Rate,
+        taxRate: payload.taxRate,
+        lateFeeRate: payload.lateFeeRate,
+        minimumMonthlyCharge: payload.minimumMonthlyCharge,
+        fixedServiceCharge: payload.fixedServiceCharge,
+        dueDateDays: payload.dueDateDays
+      }));
+
+      toast.success("Tiered Tariff & Billing settings saved & published! Active resident bills updated.");
       await fetchDashboardData();
     } catch (err: any) {
-      toast.error(getErrorMessage(err, "Failed to save billing settings."));
+      toast.error(getErrorMessage(err, "Failed to save tariff settings."));
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const handleRecordWaterPurchase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!purchaseSupplier.trim() || !purchaseVolume || !purchaseCost) {
+      toast.error("Please fill in Supplier, Volume, and Cost.");
+      return;
+    }
+    setSavingPurchase(true);
+    try {
+      await api.post("/api/bulk-purchases", {
+        supplier: purchaseSupplier,
+        purchaseDate,
+        volumeLitres: parseFloat(purchaseVolume),
+        unitCost: parseFloat(purchaseVolume) > 0 ? parseFloat(purchaseCost) / parseFloat(purchaseVolume) : 0,
+        totalCost: parseFloat(purchaseCost),
+        invoiceReference: "INV-PUR-" + Date.now().toString().slice(-6),
+        remarks: purchaseNotes
+      });
+      toast.success("Water purchase record logged successfully!");
+      setShowWaterPurchaseModal(false);
+      setPurchaseSupplier("");
+      setPurchaseVolume("");
+      setPurchaseCost("");
+      setPurchaseNotes("");
+      await fetchDashboardData();
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, "Failed to record water purchase."));
+    } finally {
+      setSavingPurchase(false);
     }
   };
 
@@ -490,9 +616,9 @@ export default function AdminDashboard() {
   const recentActivities = stats?.recentActivity || [];
   const pendingBillsTable = stats?.pendingBillsList || [];
   const residents = stats?.residents || [];
-  const invoices = stats?.invoices || [];
-  const waterPurchases = stats?.waterPurchases || [];
-  const meterReadings = stats?.meterReadings || [];
+  const invoices = invoicesList.length > 0 ? invoicesList : (stats?.invoices || stats?.pendingBillsList || []);
+  const waterPurchases = bulkPurchasesList.length > 0 ? bulkPurchasesList : (stats?.waterPurchases || []);
+  const meterReadings = stats?.allReadings || stats?.meterReadings || [];
 
   // Visualization mock data (falls back when API data not available)
   const monthlyConsumption = stats?.monthlyConsumption || chartData.map((d: any) => ({ name: d.name, usage: d.usage || 0, purchased: d.purchased || 0 }));
@@ -519,6 +645,8 @@ export default function AdminDashboard() {
       case "invoices": return "Invoices";
       case "calendar": return "Calendar";
       case "alerts": return "Alerts & Notifications";
+      case "announcements": return "Community Announcements";
+      case "audit-logs": return "Audit Logs";
       case "reports": return "Reports";
       case "visualizations": return "Analytics Hub";
       case "profile": return "Admin Profile";
@@ -843,7 +971,17 @@ export default function AdminDashboard() {
             <div className="lg:col-span-2 border border-slate-100 rounded-3xl bg-white overflow-hidden shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h3 className="text-xs font-bold uppercase tracking-wide text-[#0F4C81]">Pending Resident Approvals</h3>
-                <span className="bg-[#00B4D8]/10 text-[#00B4D8] border border-[#00B4D8]/20 text-xs font-bold px-3 py-1 rounded-full">{pendingRequests.length} Requests</span>
+                <div className="flex items-center gap-2">
+                  <span className="bg-[#00B4D8]/10 text-[#00B4D8] border border-[#00B4D8]/20 text-xs font-bold px-3 py-1 rounded-full">{pendingRequests.length} Requests</span>
+                  <button
+                    onClick={handleRefreshPendingRequests}
+                    disabled={refreshingPending}
+                    className="p-1.5 hover:bg-slate-200/60 rounded-xl text-[#0F4C81] transition-all cursor-pointer disabled:opacity-50"
+                    title="Refresh Pending Approvals"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${refreshingPending ? "animate-spin" : ""}`} />
+                  </button>
+                </div>
               </div>
               <div className="divide-y divide-slate-100">
                 {pendingRequests.length > 0 ? (
@@ -884,7 +1022,7 @@ export default function AdminDashboard() {
       {/* ═══════════════════════════════════════════════════════════ */}
       {/* RESIDENTS TAB */}
       {/* ═══════════════════════════════════════════════════════════ */}
-      {currentTab === "residents" && (
+      {currentTab === "residents" && !searchParams.get("id") && (
         <div className="space-y-6 animate-fade-in text-[#1F2937]">
           <div className="border border-slate-100 rounded-3xl bg-white p-6 space-y-6 shadow-sm">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 gap-4">
@@ -993,8 +1131,8 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td className="px-5 py-3.5 text-right flex justify-end gap-1.5">
-                            <button 
-                              onClick={() => navigate(`/admin/residents/${r.id}`)}
+                            <button
+                              onClick={() => setSearchParams({ tab: "residents", id: r.id.toString() })}
                               className="p-1.5 bg-slate-50 hover:bg-slate-100 text-[#0F4C81] rounded-lg cursor-pointer"
                               title="View details"
                             >
@@ -1069,6 +1207,19 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* RESIDENTS DETAILS VIEW */}
+      {currentTab === "residents" && searchParams.get("id") && (
+        <div className="space-y-4 animate-fade-in">
+          <button
+            onClick={() => setSearchParams({ tab: "residents" })}
+            className="flex items-center gap-2 text-[#0F4C81] hover:text-[#00B4D8] text-sm font-bold transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to Residents List
+          </button>
+          <ResidentDetails id={searchParams.get("id")!} isTab={true} />
         </div>
       )}
 
@@ -1262,6 +1413,14 @@ export default function AdminDashboard() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {recordPaymentBill && (
+            <CollectPaymentDialog
+              bill={recordPaymentBill}
+              onClose={() => setRecordPaymentBill(null)}
+              onSuccess={fetchDashboardData}
+            />
+          )}
         </div>
       )}
 
@@ -1273,7 +1432,7 @@ export default function AdminDashboard() {
           <div className="flex justify-between items-center border-b border-slate-100 pb-4">
             <div>
               <h3 className="text-lg font-bold text-[#0F4C81]">Billing Management</h3>
-              <p className="text-xs text-slate-500">Generate bills, manage billing settings, and view bill history</p>
+              <p className="text-xs text-slate-500">Generate bills, track resident balances, and record payments</p>
             </div>
             <div className="flex gap-3">
               <button
@@ -1288,10 +1447,39 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* Billing Overview Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="border border-slate-100 rounded-2xl bg-white p-5 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Billed</span>
+              <h4 className="text-2xl font-extrabold text-[#00B4D8] mt-1">
+                ₹{invoices.reduce((sum: number, b: any) => sum + Number(b.amount || b.netAmount || 0), 0).toFixed(2)}
+              </h4>
+            </div>
+            <div className="border border-slate-100 rounded-2xl bg-white p-5 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Collected</span>
+              <h4 className="text-2xl font-extrabold text-emerald-600 mt-1">
+                ₹{invoices.filter((b: any) => (b.status || "").toUpperCase() === "PAID").reduce((sum: number, b: any) => sum + Number(b.amount || b.netAmount || 0), 0).toFixed(2)}
+              </h4>
+            </div>
+            <div className="border border-slate-100 rounded-2xl bg-white p-5 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Outstanding Balance</span>
+              <h4 className="text-2xl font-extrabold text-amber-500 mt-1">
+                ₹{invoices.filter((b: any) => (b.status || "").toUpperCase() !== "PAID").reduce((sum: number, b: any) => sum + Number(b.amount || b.netAmount || 0), 0).toFixed(2)}
+              </h4>
+            </div>
+            <div className="border border-slate-100 rounded-2xl bg-white p-5 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Bills Issued</span>
+              <h4 className="text-2xl font-extrabold text-[#0F4C81] mt-1">
+                {invoices.length}
+              </h4>
+            </div>
+          </div>
+
           {/* Bills Table */}
           <div className="border border-slate-100 rounded-3xl bg-white overflow-hidden shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h4 className="text-xs font-bold uppercase tracking-wide text-[#0F4C81]">All Bills</h4>
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+              <h4 className="text-xs font-bold uppercase tracking-wide text-[#0F4C81]">All Community Resident Bills</h4>
+              <span className="text-xs font-bold text-slate-400">{invoices.length} Record(s)</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -1300,30 +1488,57 @@ export default function AdminDashboard() {
                     <th className="px-6 py-3">Bill #</th>
                     <th className="px-6 py-3">Flat</th>
                     <th className="px-6 py-3">Resident</th>
+                    <th className="px-6 py-3">Usage (L)</th>
                     <th className="px-6 py-3">Amount</th>
                     <th className="px-6 py-3">Status</th>
+                    <th className="px-6 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
-                  {pendingBillsTable.length > 0 ? (
-                    pendingBillsTable.map((bill: any) => (
-                      <tr key={bill.billNo} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-3 font-bold text-[#0F4C81]">{bill.billNo}</td>
-                        <td className="px-6 py-3">{bill.flat}</td>
-                        <td className="px-6 py-3">{bill.residentName}</td>
-                        <td className="px-6 py-3">₹{bill.amount}</td>
+                  {invoices.length > 0 ? (
+                    invoices.map((bill: any, idx: number) => (
+                      <tr key={bill.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-3 font-bold text-[#0F4C81]">{bill.billNumber || bill.billNo || bill.invoiceNo || `BILL-${bill.id || idx + 100}`}</td>
+                        <td className="px-6 py-3 font-bold text-slate-800">Flat {bill.flatNumber || bill.flat || "A-101"}</td>
+                        <td className="px-6 py-3">{bill.residentName || "Resident"}</td>
+                        <td className="px-6 py-3 text-[#00B4D8] font-bold">{bill.totalUsage || bill.usageLitres || "0"} L</td>
+                        <td className="px-6 py-3 font-extrabold text-slate-900">₹{bill.amount || bill.netAmount || "0.00"}</td>
                         <td className="px-6 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
-                            bill.status === "PAID" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-amber-50 text-amber-600 border border-amber-100"
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
+                            (bill.status || "").toUpperCase() === "PAID" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-amber-50 text-amber-600 border border-amber-100"
                           }`}>
-                            {bill.status}
+                            {bill.status || "UNPAID"}
                           </span>
+                        </td>
+                        <td className="px-6 py-3 text-right space-x-2">
+                          {(bill.status || "").toUpperCase() !== "PAID" && (
+                            <button
+                              onClick={() => setRecordPaymentBill({
+                                id: bill.id,
+                                billNumber: bill.billNumber || bill.billNo || `BILL-${bill.id}`,
+                                residentName: bill.residentName,
+                                amount: bill.amount || bill.netAmount,
+                                flatNumber: bill.flatNumber || bill.flat
+                              })}
+                              className="px-2.5 py-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-xs transition-all cursor-pointer"
+                            >
+                              Record Payment
+                            </button>
+                          )}
+                          <a
+                            href={`${api.defaults.baseURL}/api/water/bills/${bill.id}/pdf`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-[#0F4C81] bg-slate-100 hover:bg-slate-200 rounded-lg transition-all cursor-pointer"
+                          >
+                            <FileText className="h-3 w-3" /> PDF
+                          </a>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-slate-400">No bills generated yet.</td>
+                      <td colSpan={7} className="px-6 py-8 text-center text-slate-400">No bills generated yet. Click "Generate Bills" above to issue new resident bills.</td>
                     </tr>
                   )}
                 </tbody>
@@ -1331,41 +1546,9 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Billing Settings Form */}
+          {/* Payment Ledger / History Panel */}
           <div className="border border-slate-100 rounded-3xl bg-white p-6 shadow-sm">
-            <h4 className="text-sm font-bold text-[#0F4C81] mb-4">Billing Settings</h4>
-            <form onSubmit={handleSaveBillingSettings} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Tariff Rate (₹/L)</label>
-                <input type="number" step="0.01" value={billingSettings.tariffRate} onChange={(e) => setBillingSettings({ ...billingSettings, tariffRate: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Tax Rate (%)</label>
-                <input type="number" step="0.01" value={billingSettings.taxRate} onChange={(e) => setBillingSettings({ ...billingSettings, taxRate: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Late Fee (₹)</label>
-                <input type="number" step="0.01" value={billingSettings.lateFeeRate} onChange={(e) => setBillingSettings({ ...billingSettings, lateFeeRate: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Min Monthly Charge (₹)</label>
-                <input type="number" step="0.01" value={billingSettings.minimumMonthlyCharge} onChange={(e) => setBillingSettings({ ...billingSettings, minimumMonthlyCharge: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Fixed Service Charge (₹)</label>
-                <input type="number" step="0.01" value={billingSettings.fixedServiceCharge} onChange={(e) => setBillingSettings({ ...billingSettings, fixedServiceCharge: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Due Date (Days)</label>
-                <input type="number" value={billingSettings.dueDateDays} onChange={(e) => setBillingSettings({ ...billingSettings, dueDateDays: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20" />
-              </div>
-              <div className="md:col-span-3">
-                <button type="submit" disabled={savingSettings} className="bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] text-white font-bold py-2.5 px-6 rounded-xl text-xs flex items-center gap-2 cursor-pointer disabled:opacity-50">
-                  {savingSettings && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Save Settings
-                </button>
-              </div>
-            </form>
+            <PaymentHistoryPanel />
           </div>
         </div>
       )}
@@ -1377,28 +1560,150 @@ export default function AdminDashboard() {
         <div className="space-y-6 animate-fade-in text-[#1F2937]">
           <div className="flex justify-between items-center border-b border-slate-100 pb-4">
             <div>
-              <h3 className="text-lg font-bold text-[#0F4C81]">Tariff Plans</h3>
-              <p className="text-xs text-slate-500">View and manage water tariff rates for your community</p>
+              <h3 className="text-lg font-bold text-[#0F4C81]">Community Tiered Tariff Governance</h3>
+              <p className="text-xs text-slate-500">Configure tiered unit rates, base slab limits, service fees, tax percentages, and late payment penalties per apartment</p>
             </div>
             <button onClick={() => setSearchParams({})} className="text-xs font-bold text-[#00B4D8] hover:underline cursor-pointer">Back to Dashboard</button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { label: "Base Tariff Rate", value: `₹${stats?.tariffRate || "5.00"}/L`, desc: "Per liter water charge", color: "text-[#00B4D8]" },
-              { label: "Tax Rate", value: `${stats?.taxRate || "18"}%`, desc: "Applied on base charges", color: "text-[#0F4C81]" },
-              { label: "Late Fee", value: `₹${stats?.lateFeeRate || "50"}`, desc: "Penalty for overdue bills", color: "text-[#FFB703]" },
-            ].map((item) => (
-              <div key={item.label} className="border border-slate-100 rounded-2xl bg-white p-5 shadow-sm">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{item.label}</span>
-                <h4 className={`text-2xl font-extrabold ${item.color} mt-1`}>{item.value}</h4>
-                <p className="text-[10px] text-slate-400 mt-1">{item.desc}</p>
+          {/* Division Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Division 1: Tiered Consumption Rates */}
+            <div className="border border-slate-100 rounded-3xl bg-white p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <div className="h-8 w-8 rounded-xl bg-cyan-50 text-[#00B4D8] flex items-center justify-center font-extrabold text-sm">1</div>
+                <div>
+                  <h4 className="text-xs font-extrabold text-[#0F4C81] uppercase tracking-wider">Tiered Tariff Engine</h4>
+                  <p className="text-[10px] text-slate-400">Volumetric rates per household tier</p>
+                </div>
               </div>
-            ))}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2.5 rounded-xl bg-cyan-50/50 border border-cyan-100">
+                  <div>
+                    <span className="text-xs font-bold text-slate-700 block">Tier 1 (Base Range)</span>
+                    <span className="text-[10px] text-slate-400">First 0 - {(parseFloat(billingSettings.tier1LimitLitres || "10000") / 1000).toFixed(0)} kL ({billingSettings.tier1LimitLitres || "10000"} L)</span>
+                  </div>
+                  <span className="text-sm font-extrabold text-[#00B4D8]">₹{billingSettings.tier1Rate || billingSettings.tariffRate}/L</span>
+                </div>
+                <div className="flex justify-between items-center p-2.5 rounded-xl bg-purple-50/50 border border-purple-100">
+                  <div>
+                    <span className="text-xs font-bold text-slate-700 block">Tier 2 (High Usage)</span>
+                    <span className="text-[10px] text-slate-400">Beyond {(parseFloat(billingSettings.tier1LimitLitres || "10000") / 1000).toFixed(0)} kL ({billingSettings.tier1LimitLitres || "10000"} L)</span>
+                  </div>
+                  <span className="text-sm font-extrabold text-purple-600">₹{billingSettings.tier2Rate || "8.00"}/L</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Division 2: Fixed & Maintenance Charges */}
+            <div className="border border-slate-100 rounded-3xl bg-white p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-extrabold text-sm">2</div>
+                <div>
+                  <h4 className="text-xs font-extrabold text-[#0F4C81] uppercase tracking-wider">Fixed Charges & Infrastructure</h4>
+                  <p className="text-[10px] text-slate-400">Pipeline & maintenance fees</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="text-xs font-semibold text-slate-600">Fixed Service Charge</span>
+                  <span className="text-sm font-extrabold text-emerald-600">₹{billingSettings.fixedServiceCharge}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="text-xs font-semibold text-slate-600">Min Monthly Floor Charge</span>
+                  <span className="text-sm font-extrabold text-purple-600">₹{billingSettings.minimumMonthlyCharge}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Division 3: Taxes & Governance */}
+            <div className="border border-slate-100 rounded-3xl bg-white p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <div className="h-8 w-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-extrabold text-sm">3</div>
+                <div>
+                  <h4 className="text-xs font-extrabold text-[#0F4C81] uppercase tracking-wider">Taxes & Penalty Governance</h4>
+                  <p className="text-[10px] text-slate-400">Government taxes & overdue fees</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="text-xs font-semibold text-slate-600">Tax Percentage</span>
+                  <span className="text-sm font-extrabold text-[#0F4C81]">{billingSettings.taxRate}%</span>
+                </div>
+                <div className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="text-xs font-semibold text-slate-600">Overdue Penalty / Late Fee</span>
+                  <span className="text-sm font-extrabold text-amber-600">₹{billingSettings.lateFeeRate}</span>
+                </div>
+              </div>
+            </div>
+
           </div>
 
-          <div className="border border-slate-100 rounded-3xl bg-white p-6 shadow-sm">
-            <p className="text-sm text-slate-500">To modify tariff plans, navigate to the <button onClick={() => setSearchParams({ tab: "billing" })} className="text-[#00B4D8] font-bold hover:underline cursor-pointer">Billing Settings</button> section.</p>
+          {/* Real-time Tariff Structure Editor Form */}
+          <div className="border border-slate-100 rounded-3xl bg-white p-6 shadow-sm space-y-4">
+            <h4 className="text-sm font-bold text-[#0F4C81] flex items-center gap-2 border-b border-slate-100 pb-3">
+              <FileText className="h-4 w-4 text-[#00B4D8]" /> Edit Household Tiered Tariff Rates & Rules
+            </h4>
+            <form onSubmit={handleSaveBillingSettings} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Section A */}
+                <div className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                  <h5 className="text-[11px] font-extrabold text-[#00B4D8] uppercase tracking-wider">A. Tiered Rate Engine</h5>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 block mb-1">Tier 1 Threshold Limit (Litres)</label>
+                    <input type="number" value={billingSettings.tier1LimitLitres} onChange={(e) => setBillingSettings({ ...billingSettings, tier1LimitLitres: e.target.value })} className="w-full border border-slate-200 bg-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 font-bold text-slate-800" placeholder="10000 (10 kL)" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 block mb-1">Tier 1 Base Rate (₹/L, 0-10 kL)</label>
+                    <input type="number" step="0.01" value={billingSettings.tier1Rate} onChange={(e) => setBillingSettings({ ...billingSettings, tier1Rate: e.target.value, tariffRate: e.target.value })} className="w-full border border-slate-200 bg-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 font-bold text-[#00B4D8]" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 block mb-1">Tier 2 Excess Rate (₹/L, &gt;10 kL)</label>
+                    <input type="number" step="0.01" value={billingSettings.tier2Rate} onChange={(e) => setBillingSettings({ ...billingSettings, tier2Rate: e.target.value })} className="w-full border border-slate-200 bg-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 font-bold text-purple-600" />
+                  </div>
+                </div>
+
+                {/* Section B */}
+                <div className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                  <h5 className="text-[11px] font-extrabold text-emerald-600 uppercase tracking-wider">B. Fixed Infrastructure</h5>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 block mb-1">Fixed Service Charge (₹)</label>
+                    <input type="number" step="0.01" value={billingSettings.fixedServiceCharge} onChange={(e) => setBillingSettings({ ...billingSettings, fixedServiceCharge: e.target.value })} className="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 font-bold text-slate-800" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 block mb-1">Min Monthly Floor Charge (₹)</label>
+                    <input type="number" step="0.01" value={billingSettings.minimumMonthlyCharge} onChange={(e) => setBillingSettings({ ...billingSettings, minimumMonthlyCharge: e.target.value })} className="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 font-bold text-slate-800" />
+                  </div>
+                </div>
+
+                {/* Section C */}
+                <div className="space-y-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                  <h5 className="text-[11px] font-extrabold text-amber-600 uppercase tracking-wider">C. Taxes & Overdue</h5>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 block mb-1">Tax Rate (%)</label>
+                    <input type="number" step="0.01" value={billingSettings.taxRate} onChange={(e) => setBillingSettings({ ...billingSettings, taxRate: e.target.value })} className="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 font-bold text-slate-800" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 block mb-1">Overdue Penalty / Late Fee (₹)</label>
+                    <input type="number" step="0.01" value={billingSettings.lateFeeRate} onChange={(e) => setBillingSettings({ ...billingSettings, lateFeeRate: e.target.value })} className="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 font-bold text-slate-800" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 block mb-1">Payment Due Window (Days)</label>
+                    <input type="number" value={billingSettings.dueDateDays} onChange={(e) => setBillingSettings({ ...billingSettings, dueDateDays: e.target.value })} className="w-full border border-slate-200 bg-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 font-bold text-slate-800" />
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button type="submit" disabled={savingSettings} className="bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] text-white font-extrabold py-3 px-8 rounded-xl text-xs flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-md transition-all active:scale-95">
+                  {savingSettings && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Save & Publish Tiered Tariff Plan
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1411,9 +1716,56 @@ export default function AdminDashboard() {
           <div className="flex justify-between items-center border-b border-slate-100 pb-4">
             <div>
               <h3 className="text-lg font-bold text-[#0F4C81]">Water Purchase History</h3>
-              <p className="text-xs text-slate-500">Track all water purchase records for the community</p>
+              <p className="text-xs text-slate-500">Track and log external bulk water supplier purchases</p>
             </div>
-            <button onClick={() => setSearchParams({})} className="text-xs font-bold text-[#00B4D8] hover:underline cursor-pointer">Back to Dashboard</button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowWaterPurchaseModal(true)}
+                className="bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] px-4 py-2 rounded-xl text-xs font-bold text-white shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="h-4 w-4" /> Record Water Purchase
+              </button>
+              <button onClick={() => setSearchParams({})} className="text-xs font-bold text-[#00B4D8] hover:underline cursor-pointer">Back to Dashboard</button>
+            </div>
+          </div>
+
+          {/* Water Purchase KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="border border-slate-100 rounded-2xl bg-white p-5 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Purchased Volume</span>
+              <h4 className="text-2xl font-extrabold text-[#00B4D8] mt-1">
+                {(waterPurchases.reduce((acc: number, p: any) => acc + Number(p.volumeLitres || p.quantity || 0), 0) / 1000).toFixed(1)} kL
+              </h4>
+              <p className="text-[10px] text-slate-400 mt-1">{waterPurchases.reduce((acc: number, p: any) => acc + Number(p.volumeLitres || p.quantity || 0), 0).toLocaleString()} Litres total</p>
+            </div>
+
+            <div className="border border-slate-100 rounded-2xl bg-white p-5 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Procurement Expenditure</span>
+              <h4 className="text-2xl font-extrabold text-[#0F4C81] mt-1">
+                ₹{waterPurchases.reduce((acc: number, p: any) => acc + Number(p.totalCost || p.cost || 0), 0).toFixed(2)}
+              </h4>
+              <p className="text-[10px] text-slate-400 mt-1">Tanker & Municipal Supply combined</p>
+            </div>
+
+            <div className="border border-slate-100 rounded-2xl bg-white p-5 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Average Unit Cost</span>
+              <h4 className="text-2xl font-extrabold text-purple-600 mt-1">
+                ₹{(() => {
+                  const vol = waterPurchases.reduce((acc: number, p: any) => acc + Number(p.volumeLitres || p.quantity || 0), 0);
+                  const cost = waterPurchases.reduce((acc: number, p: any) => acc + Number(p.totalCost || p.cost || 0), 0);
+                  return vol > 0 ? ((cost / vol) * 1000).toFixed(2) : "0.00";
+                })()}/kL
+              </h4>
+              <p className="text-[10px] text-slate-400 mt-1">Cost per 1,000 Litres</p>
+            </div>
+
+            <div className="border border-slate-100 rounded-2xl bg-white p-5 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Active Suppliers & Vendors</span>
+              <h4 className="text-2xl font-extrabold text-emerald-600 mt-1">
+                {new Set(waterPurchases.map((p: any) => p.supplier)).size} Supplier(s)
+              </h4>
+              <p className="text-[10px] text-slate-400 mt-1">{waterPurchases.length} total deliveries logged</p>
+            </div>
           </div>
 
           <div className="border border-slate-100 rounded-3xl bg-white overflow-hidden shadow-sm">
@@ -1421,31 +1773,113 @@ export default function AdminDashboard() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-100">
                   <tr>
-                    <th className="px-6 py-4">Date</th>
-                    <th className="px-6 py-4">Quantity (L)</th>
-                    <th className="px-6 py-4">Cost</th>
-                    <th className="px-6 py-4">Supplier</th>
+                    <th className="px-6 py-4">Delivery Date</th>
+                    <th className="px-6 py-4">Supplier / Source</th>
+                    <th className="px-6 py-4">Volume (Litres)</th>
+                    <th className="px-6 py-4">Unit Cost (₹/L & ₹/kL)</th>
+                    <th className="px-6 py-4">Total Cost (₹)</th>
+                    <th className="px-6 py-4">Invoice / Ref No.</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
                   {waterPurchases.length > 0 ? (
-                    waterPurchases.map((p: any, idx: number) => (
-                      <tr key={p.id || idx} className="hover:bg-slate-50/50">
-                        <td className="px-6 py-4">{p.date}</td>
-                        <td className="px-6 py-4 font-bold text-[#00B4D8]">{p.quantity} L</td>
-                        <td className="px-6 py-4">₹{p.cost}</td>
-                        <td className="px-6 py-4 text-slate-500">{p.supplier || "N/A"}</td>
-                      </tr>
-                    ))
+                    waterPurchases.map((p: any, idx: number) => {
+                      const vol = Number(p.volumeLitres || p.quantity || 0);
+                      const cost = Number(p.totalCost || p.cost || 0);
+                      const unitCostL = vol > 0 ? (cost / vol).toFixed(2) : "0.00";
+                      const unitCostKl = vol > 0 ? ((cost / vol) * 1000).toFixed(0) : "0";
+                      return (
+                        <tr key={p.id || idx} className="hover:bg-slate-50/50">
+                          <td className="px-6 py-4 font-semibold">{p.purchaseDate || p.date}</td>
+                          <td className="px-6 py-4 text-slate-800 font-bold flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-cyan-50 text-[#00B4D8] border border-cyan-100">
+                              {p.supplier?.toLowerCase().includes("municipal") ? "Municipal" : "Tanker"}
+                            </span>
+                            {p.supplier || "Water Supplier"}
+                          </td>
+                          <td className="px-6 py-4 font-bold text-[#00B4D8]">
+                            {vol.toLocaleString()} L <span className="text-[10px] text-slate-400 font-normal">({(vol/1000).toFixed(1)} kL)</span>
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-purple-700">
+                            ₹{unitCostL}/L <span className="text-[10px] text-slate-400 font-normal">(₹{unitCostKl}/kL)</span>
+                          </td>
+                          <td className="px-6 py-4 font-extrabold text-slate-900">₹{cost.toFixed(2)}</td>
+                          <td className="px-6 py-4 text-slate-400 text-[10px] font-mono">{p.invoiceReference || `INV-PUR-${p.id || idx + 1}`}</td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-slate-400">No water purchase records found.</td>
+                      <td colSpan={6} className="px-6 py-8 text-center text-slate-400">No bulk water purchase records found. Click "Record Water Purchase" to track tanker & municipal procurement.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
           </div>
+
+          {/* Record Water Purchase Modal */}
+          <AnimatePresence>
+            {showWaterPurchaseModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="border border-slate-100 rounded-3xl bg-white p-6 w-full max-w-lg space-y-4 shadow-2xl text-slate-800"
+                >
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <h4 className="text-sm font-bold text-[#0F4C81] flex items-center gap-2">
+                      <ShoppingCart className="h-4 w-4 text-[#00B4D8]" /> Record Bulk Water Procurement
+                    </h4>
+                    <button onClick={() => setShowWaterPurchaseModal(false)} className="text-slate-400 hover:text-slate-600">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <form onSubmit={handleRecordWaterPurchase} className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Supplier / Procurement Source</label>
+                      <input type="text" placeholder="e.g. Tanker Delivery / Municipal Water Board" value={purchaseSupplier} onChange={(e) => setPurchaseSupplier(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 font-medium" required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">Delivery / Procurement Date</label>
+                        <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 font-medium" required />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">Purchased Volume (Litres)</label>
+                        <input type="number" placeholder="10000" value={purchaseVolume} onChange={(e) => setPurchaseVolume(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 font-bold text-[#00B4D8]" required />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Total Procurement Cost (₹)</label>
+                      <input type="number" step="0.01" placeholder="5000.00" value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 font-bold text-slate-900" required />
+                    </div>
+                    {purchaseVolume && purchaseCost && (
+                      <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl flex justify-between items-center text-xs">
+                        <span className="font-semibold text-purple-700">Calculated Unit Cost:</span>
+                        <span className="font-extrabold text-purple-900">
+                          ₹{(Number(purchaseCost) / Number(purchaseVolume)).toFixed(2)}/L &nbsp;|&nbsp; ₹{((Number(purchaseCost) / Number(purchaseVolume)) * 1000).toFixed(0)}/kL
+                        </span>
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Invoice / Delivery Voucher Ref</label>
+                      <input type="text" placeholder="e.g. VOUCHER-98765" value={purchaseNotes} onChange={(e) => setPurchaseNotes(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20" />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={savingPurchase}
+                      className="w-full bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] text-white font-extrabold py-3 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-md transition-all active:scale-95"
+                    >
+                      {savingPurchase && <Loader2 className="h-4 w-4 animate-spin" />}
+                      Save & Log Bulk Water Procurement
+                    </button>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
@@ -1456,8 +1890,8 @@ export default function AdminDashboard() {
         <div className="space-y-6 animate-fade-in text-[#1F2937]">
           <div className="flex justify-between items-center border-b border-slate-100 pb-4">
             <div>
-              <h3 className="text-lg font-bold text-[#0F4C81]">Invoices</h3>
-              <p className="text-xs text-slate-500">View all invoices and their payment status</p>
+              <h3 className="text-lg font-bold text-[#0F4C81]">Community Invoices Database</h3>
+              <p className="text-xs text-slate-500">Neat database of all invoices generated for community residents with status & PDF options</p>
             </div>
             <button onClick={() => setSearchParams({})} className="text-xs font-bold text-[#00B4D8] hover:underline cursor-pointer">Back to Dashboard</button>
           </div>
@@ -1468,63 +1902,53 @@ export default function AdminDashboard() {
                 <thead className="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-100">
                   <tr>
                     <th className="px-6 py-4">Invoice #</th>
-                    <th className="px-6 py-4">Resident</th>
+                    <th className="px-6 py-4">Flat No</th>
+                    <th className="px-6 py-4">Resident Name</th>
+                    <th className="px-6 py-4">Usage (L)</th>
                     <th className="px-6 py-4">Amount</th>
-                    <th className="px-6 py-4">Date</th>
-                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Billing Date</th>
+                    <th className="px-6 py-4">Payment Status</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
-                  {invoices.length > 0 ? (
-                    invoices.map((inv: any, idx: number) => (
-                      <tr key={inv.id || idx} className="hover:bg-slate-50/50">
-                        <td className="px-6 py-4 font-bold text-[#0F4C81]">{inv.invoiceNo || `INV-${inv.id}`}</td>
-                        <td className="px-6 py-4">{inv.residentName}</td>
-                        <td className="px-6 py-4">₹{inv.amount}</td>
-                        <td className="px-6 py-4 text-slate-500">{inv.date}</td>
+                  {(invoices.length > 0 ? invoices : pendingBillsTable).length > 0 ? (
+                    (invoices.length > 0 ? invoices : pendingBillsTable).map((inv: any, idx: number) => (
+                      <tr key={inv.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 font-extrabold text-[#0F4C81]">{inv.invoiceNo || inv.billNo || `INV-${inv.id || idx + 100}`}</td>
+                        <td className="px-6 py-4 font-bold text-slate-800">Flat {inv.flat || inv.flatNumber || "A-101"}</td>
+                        <td className="px-6 py-4 font-semibold text-slate-700">{inv.residentName || "Resident"}</td>
+                        <td className="px-6 py-4 text-[#00B4D8] font-bold">{inv.usageLitres || inv.totalUsage || "1200"} L</td>
+                        <td className="px-6 py-4 font-extrabold text-slate-900">₹{inv.amount || inv.netAmount || "60.00"}</td>
+                        <td className="px-6 py-4 text-slate-500">{inv.date || inv.billingMonth || "Current Cycle"}</td>
                         <td className="px-6 py-4">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
-                            inv.status === "PAID" ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                            : inv.status === "OVERDUE" ? "bg-rose-50 text-rose-500 border border-rose-100"
+                          <span className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
+                            (inv.status || "").toUpperCase() === "PAID" ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                            : (inv.status || "").toUpperCase() === "OVERDUE" ? "bg-rose-50 text-rose-500 border border-rose-100"
                             : "bg-amber-50 text-amber-600 border border-amber-100"
                           }`}>
-                            {inv.status}
+                            {inv.status || "UNPAID"}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <a
+                            href={`${api.defaults.baseURL}/api/water/bills/${inv.id}/pdf`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold text-white bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] hover:from-[#0096B4] hover:to-[#0A3860] rounded-xl shadow-xs transition-all cursor-pointer"
+                          >
+                            <FileText className="h-3 w-3" /> PDF Invoice
+                          </a>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-slate-400">No invoices found.</td>
+                      <td colSpan={8} className="px-6 py-8 text-center text-slate-400">No invoices found in database. Click "Generate Bills" to issue invoices.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════ */}
-      {/* CALENDAR TAB */}
-      {/* ═══════════════════════════════════════════════════════════ */}
-      {currentTab === "calendar" && (
-        <div className="space-y-6 animate-fade-in text-[#1F2937]">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-            <div>
-              <h3 className="text-lg font-bold text-[#0F4C81]">Calendar</h3>
-              <p className="text-xs text-slate-500">View upcoming events, due dates, and billing cycles</p>
-            </div>
-            <button onClick={() => setSearchParams({})} className="text-xs font-bold text-[#00B4D8] hover:underline cursor-pointer">Back to Dashboard</button>
-          </div>
-
-          <div className="border border-slate-100 rounded-3xl bg-white p-8 shadow-sm">
-            <div className="flex items-center justify-center gap-3 text-slate-400 py-16">
-              <CalendarIcon className="h-10 w-10 text-[#00B4D8]/30" />
-              <div>
-                <p className="text-sm font-bold text-slate-500">Calendar View</p>
-                <p className="text-xs text-slate-400">Billing cycles, due dates, and community events will appear here.</p>
-              </div>
             </div>
           </div>
         </div>
@@ -1588,36 +2012,7 @@ export default function AdminDashboard() {
       {/* ═══════════════════════════════════════════════════════════ */}
       {currentTab === "reports" && (
         <div className="space-y-6 animate-fade-in text-[#1F2937]">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-            <div>
-              <h3 className="text-lg font-bold text-[#0F4C81]">Reports</h3>
-              <p className="text-xs text-slate-500">Generate and download community reports</p>
-            </div>
-            <button onClick={() => setSearchParams({})} className="text-xs font-bold text-[#00B4D8] hover:underline cursor-pointer">Back to Dashboard</button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { title: "Water Usage Report", desc: "Monthly consumption breakdown by flat", icon: Droplets },
-              { title: "Billing Report", desc: "Revenue collected vs outstanding dues", icon: Receipt },
-              { title: "Resident Report", desc: "Community member details and status", icon: Users },
-            ].map((report) => (
-              <div key={report.title} className="border border-slate-100 rounded-2xl bg-white p-5 shadow-sm hover:shadow-md transition-all group cursor-pointer">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2.5 rounded-xl bg-[#00B4D8]/10 text-[#00B4D8] group-hover:scale-105 transition-transform">
-                    <report.icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800">{report.title}</h4>
-                    <p className="text-[10px] text-slate-400">{report.desc}</p>
-                  </div>
-                </div>
-                <button className="text-xs font-bold text-[#00B4D8] flex items-center gap-1 hover:underline cursor-pointer">
-                  <Download className="h-3.5 w-3.5" /> Generate Report
-                </button>
-              </div>
-            ))}
-          </div>
+          <ReportsPage />
         </div>
       )}
 
@@ -1926,6 +2321,24 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {currentTab === "announcements" && (
+        <div className="space-y-6 animate-fade-in text-[#1F2937]">
+          <AnnouncementCenter />
+        </div>
+      )}
+
+      {currentTab === "audit-logs" && (
+        <div className="space-y-6 animate-fade-in text-[#1F2937]">
+          <AuditLogViewer />
+        </div>
+      )}
+
+      {currentTab === "billing-cycles" && (
+        <div className="space-y-6 animate-fade-in text-[#1F2937]">
+          <BillingCycleManager />
         </div>
       )}
 

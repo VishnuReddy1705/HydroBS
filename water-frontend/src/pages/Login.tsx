@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import api from '@/api';
+import { getErrorMessage } from '@/utils/error';
 import { saveSession } from '@/lib/auth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Droplet, Eye, EyeOff, Lock, Mail, ChevronRight, UserPlus, Building2 } from 'lucide-react';
@@ -31,24 +33,10 @@ export default function HydroBSLogin() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8080/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
+      const { data } = await api.post('/api/auth/login', credentials);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Invalid email or password.');
-      }
-
-      console.log('Login successful! Session data:', data);
-      
       saveSession(data.token, data.refreshToken, data.role, data.fullName || 'User');
-      
+
       if (data.role === 'SUPER_ADMIN') {
         navigate('/super-admin/dashboard');
       } else if (data.role === 'ADMIN') {
@@ -60,7 +48,7 @@ export default function HydroBSLogin() {
       }
 
     } catch (err: any) {
-      setError(err.message || 'Could not connect to the server.');
+      setError(getErrorMessage(err, 'Could not connect to the server.'));
     } finally {
       setLoading(false);
     }

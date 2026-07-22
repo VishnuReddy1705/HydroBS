@@ -26,9 +26,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @RestController
 @RequestMapping("/api/water")
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class WaterController {
 
     private final UserRepository userRepository;
@@ -44,9 +47,11 @@ public class WaterController {
     private final com.wumbap.wumbap.service.AuditLogService auditLogService;
     private final MeterRepository meterRepository;
     private final com.wumbap.wumbap.service.LeakDetectionService leakDetectionService;
+    private final com.wumbap.wumbap.service.BillingEngineService billingEngineService;
 
     @PostMapping(value = "/upload-readings", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional
     public ResponseEntity<?> uploadReadings(
             @RequestParam("file") MultipartFile file,
             Authentication authentication
@@ -338,81 +343,13 @@ public class WaterController {
                 .toList();
 
         int generatedCount = 0;
-        BigDecimal tariffRate = community.getTariffRate();
-        BigDecimal taxRate = community.getTaxRate();
-        BigDecimal discountRate = community.getDiscountRate();
-
         for (User resident : residents) {
-            LocalDate start = billingMonth;
-            LocalDate end = billingMonth.plusMonths(1).minusDays(1);
-
-            List<MeterReading> readings = meterReadingRepository.findByResidentIdOrderByReadingDateDesc(resident.getId()).stream()
-                    .filter(r -> !r.getReadingDate().isBefore(start) && !r.getReadingDate().isAfter(end))
-                    .toList();
-
-            BigDecimal totalUsage = readings.stream()
-                    .map(MeterReading::getUsageLitres)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-            // Compute late fees
-            List<WaterBill> unpaidBills = waterBillRepository.findByResidentId(resident.getId()).stream()
-                    .filter(b -> "UNPAID".equalsIgnoreCase(b.getStatus()) && b.getBillingMonth().isBefore(billingMonth))
-                    .toList();
-            BigDecimal lateFee = BigDecimal.ZERO;
-            if (!unpaidBills.isEmpty()) {
-                lateFee = community.getLateFeeRate();
+            try {
+                billingEngineService.generateSingleResidentBill(resident, community, billingMonth, "SYSTEM", "Automatic Recalculation", true);
+                generatedCount++;
+            } catch (Exception e) {
+                // ignore
             }
-
-            BigDecimal baseCharges = totalUsage.multiply(tariffRate);
-            if (baseCharges.compareTo(community.getMinimumMonthlyCharge()) < 0) {
-                baseCharges = community.getMinimumMonthlyCharge();
-            }
-            baseCharges = baseCharges.add(community.getFixedServiceCharge());
-
-            BigDecimal taxAmount = baseCharges.multiply(taxRate).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
-            BigDecimal discountAmount = baseCharges.multiply(discountRate).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
-            BigDecimal amount = baseCharges.add(taxAmount).add(lateFee).subtract(discountAmount);
-
-            // Save or update bill
-            Optional<WaterBill> existingBill = waterBillRepository.findByResidentIdAndBillingMonth(resident.getId(), billingMonth);
-            WaterBill bill;
-            if (existingBill.isPresent()) {
-                bill = existingBill.get();
-                bill.setTotalUsage(totalUsage);
-                bill.setTariffRate(tariffRate);
-                bill.setTaxAmount(taxAmount);
-                bill.setLateFee(lateFee);
-                bill.setDiscountAmount(discountAmount);
-                bill.setAmount(amount);
-                bill.setDueDate(LocalDate.now().plusDays(community.getDueDateDays()));
-            } else {
-                bill = WaterBill.builder()
-                        .resident(resident)
-                        .community(community)
-                        .billingMonth(billingMonth)
-                        .totalUsage(totalUsage)
-                        .tariffRate(tariffRate)
-                        .taxAmount(taxAmount)
-                        .lateFee(lateFee)
-                        .discountAmount(discountAmount)
-                        .amount(amount)
-                        .status("UNPAID")
-                        .dueDate(LocalDate.now().plusDays(community.getDueDateDays()))
-                        .build();
-            }
-
-            waterBillRepository.save(bill);
-            generatedCount++;
-
-            // Create notification for resident
-            Notification notification = Notification.builder()
-                    .user(resident)
-                    .community(community)
-                    .title("Water Invoice Generated")
-                    .message("Your water invoice for " + billingMonth.getMonth().name() + " is ready. Due: ₹" + amount + ".")
-                    .type("BILL_GENERATED")
-                    .build();
-            notificationRepository.save(notification);
         }
 
         // Save Calendar event for billing generation milestone
@@ -430,6 +367,7 @@ public class WaterController {
 
     @PostMapping("/generate-bills")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional
     public ResponseEntity<?> generateBills(
             @RequestParam(required = false) String month,
             Authentication authentication
@@ -483,6 +421,8 @@ public class WaterController {
                     map.put("residentName", b.getResident().getFullName());
                     map.put("flatNumber", b.getResident().getFlatNumber());
                     map.put("billingMonth", b.getBillingMonth().toString());
+                    map.put("billingStartDate", b.getBillingStartDate() != null ? b.getBillingStartDate().toString() : null);
+                    map.put("billingEndDate", b.getBillingEndDate() != null ? b.getBillingEndDate().toString() : null);
                     map.put("totalUsage", b.getTotalUsage());
                     map.put("tariffRate", b.getTariffRate());
                     map.put("taxAmount", b.getTaxAmount());
@@ -498,31 +438,33 @@ public class WaterController {
     }
 
     @PostMapping("/readings/manual")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RESIDENT')")
+    @Transactional
     public ResponseEntity<?> addManualReading(@RequestBody Map<String, Object> req, Authentication auth) {
-        User admin = userRepository.findByEmail(auth.getName())
-                .orElseThrow(() -> new RuntimeException("Admin not found"));
+        User caller = userRepository.findByEmail(auth.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
         
-        Long communityId = null;
+        Community community = caller.getCommunity();
         if (req.get("communityId") != null && !req.get("communityId").toString().isBlank()) {
             try {
-                communityId = Long.valueOf(req.get("communityId").toString());
+                Long commId = Long.valueOf(req.get("communityId").toString());
+                community = communityRepository.findById(commId).orElse(community);
             } catch (Exception ignored) {}
         }
 
-        Community community;
-        if (communityId != null) {
-            community = communityRepository.findById(communityId)
-                    .orElseThrow(() -> new RuntimeException("Community not found"));
-        } else {
+        if (community == null && caller.getRole() != Role.SUPER_ADMIN) {
             try {
-                community = resolveCommunity(admin);
+                community = resolveCommunity(caller);
             } catch (Exception e) {
                 return ResponseEntity.badRequest().body(e.getMessage());
             }
         }
 
         String flat = (String) req.get("flatNumber");
+        if (caller.getRole() == Role.RESIDENT && (flat == null || flat.isBlank())) {
+            flat = caller.getFlatNumber();
+        }
+
         String dateStr = (String) req.get("readingDate");
         
         // Single "reading" input representing the usage/consumption value directly in litres
@@ -530,8 +472,8 @@ public class WaterController {
                 ? new BigDecimal(req.get("reading").toString()) 
                 : (req.get("usageLitres") != null ? new BigDecimal(req.get("usageLitres").toString()) : BigDecimal.ZERO);
 
-        if (flat == null || flat.trim().isEmpty() || dateStr == null || dateStr.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("Flat number and reading date are required.");
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            dateStr = LocalDate.now().toString();
         }
 
         LocalDate date = LocalDate.parse(dateStr);
@@ -543,28 +485,44 @@ public class WaterController {
             return ResponseEntity.badRequest().body("Reading value cannot be negative.");
         }
 
-        final String normManualFlat = normalizeFlatNumber(flat);
-        User resident = userRepository.findAll().stream()
-                .filter(u -> u.getCommunity() != null 
-                        && u.getCommunity().getId().equals(community.getId()) 
-                        && u.getRole() == Role.RESIDENT
-                        && u.getFlatNumber() != null 
-                        && normalizeFlatNumber(u.getFlatNumber()).equals(normManualFlat))
-                .findFirst()
-                .orElse(null);
+        User resident = caller;
+        if (caller.getRole() != Role.RESIDENT) {
+            if (flat == null || flat.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Flat number is required.");
+            }
+            final String normManualFlat = normalizeFlatNumber(flat);
+            final Community targetComm = community;
+            resident = userRepository.findAll().stream()
+                    .filter(u -> u.getCommunity() != null 
+                            && (targetComm == null || u.getCommunity().getId().equals(targetComm.getId()))
+                            && u.getRole() == Role.RESIDENT
+                            && u.getFlatNumber() != null 
+                            && normalizeFlatNumber(u.getFlatNumber()).equals(normManualFlat))
+                    .findFirst()
+                    .orElse(null);
 
-        if (resident == null) {
-            return ResponseEntity.badRequest().body("Resident not found in your community for flat " + flat);
+            if (resident == null) {
+                return ResponseEntity.badRequest().body("Resident not found for flat " + flat);
+            }
+            community = resident.getCommunity();
+        }
+
+        // BLOCK DUPLICATE READINGS ON THE SAME DAY FOR THE RESIDENT
+        Optional<MeterReading> existingOpt = meterReadingRepository.findByResidentIdAndReadingDate(resident.getId(), date);
+        if (existingOpt.isPresent()) {
+            return ResponseEntity.badRequest().body("A meter reading for flat " + resident.getFlatNumber() + " has already been submitted for " + date + ". Duplicate readings on the same day are not allowed.");
         }
 
         // Get or create dummy processing upload job for manual logs
+        final Community finalComm = community;
+        final User adminUser = caller;
         UploadJob dummyJob = uploadJobRepository.findAll().stream()
-                .filter(j -> j.getCommunity().getId().equals(community.getId()) && "MANUAL_ENTRY".equals(j.getOriginalFilename()))
+                .filter(j -> finalComm != null && j.getCommunity() != null && j.getCommunity().getId().equals(finalComm.getId()) && "MANUAL_ENTRY".equals(j.getOriginalFilename()))
                 .findFirst()
                 .orElseGet(() -> {
                     UploadJob job = UploadJob.builder()
-                            .community(community)
-                            .uploadedBy(admin)
+                            .community(finalComm)
+                            .uploadedBy(adminUser)
                             .originalFilename("MANUAL_ENTRY")
                             .uploadStatus(UploadStatus.COMPLETED)
                             .totalRows(1)
@@ -587,26 +545,15 @@ public class WaterController {
         BigDecimal usageLitres = readingVal;
         BigDecimal currentReading = previousReading.add(usageLitres);
 
-        // Save or update meter reading (supporting overwrite updates)
-        Optional<MeterReading> existingOpt = meterReadingRepository.findByResidentIdAndReadingDate(resident.getId(), date);
-        MeterReading reading;
-        if (existingOpt.isPresent()) {
-            reading = existingOpt.get();
-            reading.setPreviousReading(previousReading);
-            reading.setCurrentReading(currentReading);
-            reading.setUsageLitres(usageLitres);
-            reading.setUploadJob(dummyJob);
-        } else {
-            reading = MeterReading.builder()
-                    .uploadJob(dummyJob)
-                    .community(community)
-                    .resident(resident)
-                    .readingDate(date)
-                    .previousReading(previousReading)
-                    .currentReading(currentReading)
-                    .usageLitres(usageLitres)
-                    .build();
-        }
+        MeterReading reading = MeterReading.builder()
+                .uploadJob(dummyJob)
+                .community(community)
+                .resident(resident)
+                .readingDate(date)
+                .previousReading(previousReading)
+                .currentReading(currentReading)
+                .usageLitres(usageLitres)
+                .build();
 
         // Run anomaly detection
         detectAndFlagAnomaly(reading, resident);
@@ -621,6 +568,13 @@ public class WaterController {
                 .eventType("UPLOAD_JOB")
                 .build();
         calendarEventRepository.save(manualEvent);
+
+        // Automatically calculate & generate bill for resident based on tariff
+        try {
+            billingEngineService.generateSingleResidentBill(resident, community, date, caller.getEmail(), "Manual reading bill generation", true);
+        } catch (Exception e) {
+            System.err.println("Error auto-generating bill after manual reading: " + e.getMessage());
+        }
 
         // Trigger notifications and high-usage alerts instantly
         if (reading.getIsAnomaly() != null && reading.getIsAnomaly()) {
@@ -652,6 +606,7 @@ public class WaterController {
 
     @PutMapping("/billing-settings")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional
     public ResponseEntity<?> updateBillingSettings(@RequestBody Map<String, Object> req, Authentication auth) {
         User admin = userRepository.findByEmail(auth.getName())
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
@@ -676,6 +631,9 @@ public class WaterController {
         }
 
         if (req.get("tariffRate") != null) community.setTariffRate(new BigDecimal(req.get("tariffRate").toString()));
+        if (req.get("tier1LimitLitres") != null) community.setTier1LimitLitres(new BigDecimal(req.get("tier1LimitLitres").toString()));
+        if (req.get("tier1Rate") != null) community.setTier1Rate(new BigDecimal(req.get("tier1Rate").toString()));
+        if (req.get("tier2Rate") != null) community.setTier2Rate(new BigDecimal(req.get("tier2Rate").toString()));
         if (req.get("taxRate") != null) community.setTaxRate(new BigDecimal(req.get("taxRate").toString()));
         if (req.get("lateFeeRate") != null) community.setLateFeeRate(new BigDecimal(req.get("lateFeeRate").toString()));
         if (req.get("discountRate") != null) community.setDiscountRate(new BigDecimal(req.get("discountRate").toString()));
@@ -694,9 +652,25 @@ public class WaterController {
     }
 
     @GetMapping("/bills/{id}/pdf")
-    public ResponseEntity<?> downloadBillPdf(@PathVariable Long id) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RESIDENT')")
+    public ResponseEntity<?> downloadBillPdf(@PathVariable Long id, Authentication authentication) {
         WaterBill bill = waterBillRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
+
+        // Authorization: SUPER_ADMIN (any), ADMIN (own community only), RESIDENT (own bill only).
+        User caller = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        boolean allowed = switch (caller.getRole()) {
+            case SUPER_ADMIN -> true;
+            case ADMIN -> caller.getCommunity() != null && bill.getCommunity() != null
+                    && caller.getCommunity().getId().equals(bill.getCommunity().getId());
+            case RESIDENT -> bill.getResident() != null
+                    && caller.getId().equals(bill.getResident().getId());
+        };
+        if (!allowed) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("You are not authorized to access this invoice.");
+        }
         try {
             byte[] pdfBytes = pdfService.generateWaterBillPdf(bill);
             HttpHeaders headers = new HttpHeaders();
@@ -711,6 +685,7 @@ public class WaterController {
 
     @PostMapping("/bills/{id}/email")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional
     public ResponseEntity<?> emailBill(@PathVariable Long id) {
         WaterBill bill = waterBillRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));

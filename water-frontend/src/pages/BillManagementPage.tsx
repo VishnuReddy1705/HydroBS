@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, Search, Plus, Filter, Download, Mail, Edit3, 
-  RotateCw, CheckCircle, XCircle, AlertTriangle, Eye, RefreshCw,
-  Printer, ArrowRight, User, Settings, Info, ChevronLeft, ChevronRight
+  RotateCw, XCircle, AlertTriangle, Eye, RefreshCw,
+  ArrowRight, Settings, Info, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { billingService, type Bill } from '../services/billingService';
 import { getCommunityId, getRole } from '@/lib/auth';
@@ -67,7 +67,7 @@ export default function BillManagementPage() {
       const data = await billingService.searchBills(params);
       setBills(data.content || []);
       setTotalElements(data.totalElements || 0);
-    } catch (err: any) {
+    } catch  {
       toast.error('Failed to search utility bills');
     } finally {
       setLoading(false);
@@ -150,7 +150,7 @@ export default function BillManagementPage() {
     try {
       await billingService.triggerEmail(id);
       toast.success('Email invoice notification dispatched');
-    } catch (err: any) {
+    } catch  {
       toast.error('Failed to send invoice email');
     }
   };

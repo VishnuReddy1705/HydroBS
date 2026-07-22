@@ -133,6 +133,8 @@ public class BillingEngineService {
                                 .community(community)
                                 .billingCycle(cycle)
                                 .billingMonth(cycle.getStartDate())
+                                .billingStartDate(cycle.getStartDate())
+                                .billingEndDate(cycle.getEndDate())
                                 .totalUsage(residentUsage)
                                 .tariffRate(totalVolume.compareTo(BigDecimal.ZERO) > 0 ? totalPurchasedCost.divide(totalVolume, 4, RoundingMode.HALF_UP) : BigDecimal.ZERO)
                                 .taxAmount(BigDecimal.ZERO)
@@ -302,12 +304,8 @@ public class BillingEngineService {
     public WaterBill generateSingleResidentBill(User resident, Community community, LocalDate billingMonth, String generatedBy, String notes, boolean overwrite, BillingCycle cycle) {
         Optional<WaterBill> existingBill = waterBillRepository.findByResidentIdAndBillingMonth(resident.getId(), billingMonth);
         if (existingBill.isPresent()) {
-            if (overwrite) {
-                waterBillRepository.delete(existingBill.get());
-                waterBillRepository.flush();
-            } else {
-                throw new IllegalStateException("Bill already exists for resident: " + resident.getFullName() + " for period: " + billingMonth);
-            }
+            waterBillRepository.delete(existingBill.get());
+            waterBillRepository.flush();
         }
 
         LocalDate start = (cycle != null) ? cycle.getStartDate() : billingMonth.withDayOfMonth(1);
@@ -402,16 +400,24 @@ public class BillingEngineService {
                 consumptionCharge = minimumCharge;
             }
         } else {
-            // Fallback to community table defaults
+            // Tiered Tariff Calculation based on Community Settings
             unitPrice = community.getTariffRate();
             taxPercentage = community.getTaxRate();
             lateFee = community.getLateFeeRate();
-            discount = community.getDiscountRate(); // treat as a percentage
+            discount = community.getDiscountRate();
             minimumCharge = community.getMinimumMonthlyCharge();
             serviceCharge = community.getFixedServiceCharge();
             dueDays = community.getDueDateDays();
 
-            consumptionCharge = totalUsage.multiply(unitPrice);
+            BigDecimal tier1Limit = community.getTier1LimitLitres() != null ? community.getTier1LimitLitres() : new BigDecimal("10000.00");
+            BigDecimal tier1Rate = community.getTier1Rate() != null ? community.getTier1Rate() : unitPrice;
+            BigDecimal tier2Rate = community.getTier2Rate() != null ? community.getTier2Rate() : unitPrice.multiply(new BigDecimal("1.5"));
+
+            BigDecimal tier1Usage = totalUsage.min(tier1Limit);
+            BigDecimal tier2Usage = totalUsage.subtract(tier1Usage).max(BigDecimal.ZERO);
+
+            consumptionCharge = tier1Usage.multiply(tier1Rate).add(tier2Usage.multiply(tier2Rate));
+
             if (consumptionCharge.compareTo(minimumCharge) < 0) {
                 consumptionCharge = minimumCharge;
             }
@@ -451,6 +457,8 @@ public class BillingEngineService {
                 .community(community)
                 .billingCycle(cycle)
                 .billingMonth(billingMonth)
+                .billingStartDate(start)
+                .billingEndDate(end)
                 .totalUsage(totalUsage)
                 .tariffRate(unitPrice)
                 .taxAmount(taxAmount.setScale(2, RoundingMode.HALF_UP))
@@ -797,6 +805,8 @@ public class BillingEngineService {
                 .billNumber(bill.getBillNumber())
                 .invoiceNumber(bill.getInvoiceNumber())
                 .billingMonth(bill.getBillingMonth())
+                .billingStartDate(bill.getBillingStartDate())
+                .billingEndDate(bill.getBillingEndDate())
                 .totalUsage(bill.getTotalUsage())
                 .tariffRate(bill.getTariffRate())
                 .taxAmount(bill.getTaxAmount())

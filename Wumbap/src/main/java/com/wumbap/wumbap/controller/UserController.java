@@ -17,6 +17,7 @@ public class UserController {
     private final UserRepository userRepository;
 
     @GetMapping("/me")
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public MeResponse me(Authentication authentication) {
 
         User user = userRepository.findByEmail(authentication.getName())

@@ -18,6 +18,8 @@ public class BillResponse {
     private String billNumber;
     private String invoiceNumber;
     private LocalDate billingMonth;
+    private LocalDate billingStartDate;
+    private LocalDate billingEndDate;
     private BigDecimal totalUsage;
     private BigDecimal tariffRate;
     private BigDecimal taxAmount;

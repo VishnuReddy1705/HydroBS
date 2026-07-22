@@ -16,16 +16,19 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.Map;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @RestController
 @RequestMapping("/api/reports")
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ReportController {
 
     private final ReportService reportService;
     private final UserRepository userRepository;
 
     @GetMapping("/preview")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'RESIDENT')")
     public ResponseEntity<?> previewReport(
             @RequestParam String reportType,
             @RequestParam String frequency,
@@ -52,6 +55,12 @@ public class ReportController {
                 return ResponseEntity.badRequest().body("You are not associated with any community.");
             }
             commId = user.getCommunity().getId();
+        } else if (user.getRole() == Role.RESIDENT) {
+            if (user.getCommunity() == null) {
+                return ResponseEntity.badRequest().body("You are not associated with any community.");
+            }
+            commId = user.getCommunity().getId();
+            residentId = user.getId();
         }
 
         int targetYear = year != null ? year : LocalDate.now().getYear();
@@ -76,7 +85,7 @@ public class ReportController {
     }
 
     @GetMapping("/download/{format}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'RESIDENT')")
     public ResponseEntity<?> downloadReport(
             @PathVariable String format,
             @RequestParam String reportType,
@@ -104,6 +113,12 @@ public class ReportController {
                 return ResponseEntity.badRequest().body("You are not associated with any community.");
             }
             commId = user.getCommunity().getId();
+        } else if (user.getRole() == Role.RESIDENT) {
+            if (user.getCommunity() == null) {
+                return ResponseEntity.badRequest().body("You are not associated with any community.");
+            }
+            commId = user.getCommunity().getId();
+            residentId = user.getId();
         }
 
         int targetYear = year != null ? year : LocalDate.now().getYear();

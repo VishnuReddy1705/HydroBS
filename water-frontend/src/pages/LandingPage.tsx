@@ -1,68 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Lenis from "lenis";
 import { 
-  Droplet, BarChart3, ShieldCheck, Users, Zap, Bell, 
-  TrendingUp, ArrowRight, CheckCircle2, Waves, Activity, 
-  DollarSign, Smartphone, Database, Award, Star, Quote, 
-  Layers, RefreshCw, AlertTriangle, Shield, CheckCircle, Cpu,
-  Sparkles, ArrowDown
+  Droplet, ShieldCheck, Users, Zap, TrendingUp, ArrowRight, Activity, 
+  Database, Layers, Cpu, Sparkles, ShoppingCart, BarChart3, CheckCircle2, ChevronRight, X
 } from "lucide-react";
 
-// Feature list data
-const features = [
-  {
-    icon: Activity,
-    title: "Real-Time Telemetry",
-    desc: "Monitor residential water distribution, flow velocities, and pipeline pressure metrics in real-time.",
-    color: "from-[#1D82E0] to-[#39C6FC]"
-  },
-  {
-    icon: TrendingUp,
-    title: "Automated Billing",
-    desc: "Seamlessly compute bills using customizable slab structures or fallback occupancy formulas.",
-    color: "from-[#39C6FC] to-[#0A3B75]"
-  },
-  {
-    icon: Zap,
-    title: "CSV Ingestion Engine",
-    desc: "Bulk import meter indices with an auto-aligning parser that resolves column header variances.",
-    color: "from-[#1D82E0] to-[#FFFFFF]"
-  },
-  {
-    icon: Users,
-    title: "Resident Portal",
-    desc: "Give tenants direct access to download bills, review leak warnings, and track historic usage.",
-    color: "from-[#0A3B75] to-[#1D82E0]"
-  },
-  {
-    icon: ShieldCheck,
-    title: "Role-Based Security",
-    desc: "Granular access controls built for Super Admins, Community Admins, and Residents.",
-    color: "from-[#1D82E0] to-[#0A3B75]"
-  },
-  {
-    icon: Database,
-    title: "Audit Ledger",
-    desc: "Persistent logs for tanker deliveries, municipal bulk purchases, and shared community costs.",
-    color: "from-[#39C6FC] to-[#0A3B75]"
-  }
-];
-
 export default function LandingPage() {
-  const [openingPhase, setOpeningPhase] = useState<"loading" | "ready" | "scrolled">("loading");
+  const [openingPhase, setOpeningPhase] = useState<"loading" | "ready">("loading");
   const [activePreviewTab, setActivePreviewTab] = useState<"super" | "admin" | "resident">("admin");
-  const [isConservationActive, setIsConservationActive] = useState(false);
-  const [warpScale, setWarpScale] = useState(0);
+  const [demoRequested, setDemoRequested] = useState(false);
+  const [demoEmail, setDemoEmail] = useState("");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const backgroundCanvasRef = useRef<HTMLCanvasElement>(null);
-  const storytellingRef = useRef<HTMLDivElement>(null);
-
-  // Scroll tracking for cinematic storytelling
-  const { scrollYProgress } = useScroll();
-  const textOpacity = useTransform(scrollYProgress, [0, 0.1], [1, 0]);
 
   // Lenis smooth scroll initialization
   useEffect(() => {
@@ -79,12 +30,12 @@ export default function LandingPage() {
 
     setTimeout(() => {
       setOpeningPhase("ready");
-    }, 1500);
+    }, 800);
 
     return () => lenis.destroy();
   }, []);
 
-  // Water Particle Morphing & Fluid Physics Simulation (Vibrant Particle Colors)
+  // WebGL / Canvas Water Caustics Particle Simulation
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -93,411 +44,368 @@ export default function LandingPage() {
 
     let animId: number;
     let time = 0;
-    const numParticles = 200;
+    const numParticles = 160;
     const particles: Array<{
       x: number;
       y: number;
-      targetX: number;
-      targetY: number;
       vx: number;
       vy: number;
       size: number;
       alpha: number;
     }> = [];
 
-    // Initialize particles randomly
     for (let i = 0; i < numParticles; i++) {
       particles.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        targetX: canvas.width / 2,
-        targetY: canvas.height / 2,
-        vx: 0,
-        vy: 0,
-        size: Math.random() * 2 + 1.2,
+        vx: (Math.random() - 0.5) * 0.8,
+        vy: (Math.random() - 0.5) * 0.8,
+        size: Math.random() * 2.5 + 1,
         alpha: Math.random() * 0.6 + 0.3
       });
     }
 
-    const mouse = { x: -1000, y: -1000, active: false };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      mouse.x = e.clientX - rect.left;
-      mouse.y = e.clientY - rect.top;
-      mouse.active = true;
-    };
-    const handleMouseLeave = () => {
-      mouse.active = false;
-    };
-
-    canvas.addEventListener("mousemove", handleMouseMove);
-    canvas.addEventListener("mouseleave", handleMouseLeave);
-
     const render = () => {
-      time += 0.03;
+      time += 0.02;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Scroll progress mapping
-      const scrollPos = window.scrollY;
-      let morphState: "droplet" | "river" | "pipeline" | "logo" = "droplet";
+      particles.forEach((p) => {
+        p.x += p.vx + Math.sin(time + p.y * 0.01) * 0.3;
+        p.y += p.vy + Math.cos(time + p.x * 0.01) * 0.3;
 
-      if (scrollPos > 1200) {
-        morphState = "logo";
-      } else if (scrollPos > 700) {
-        morphState = "pipeline";
-      } else if (scrollPos > 250) {
-        morphState = "river";
-      }
+        if (p.x < 0) p.x = canvas.width;
+        if (p.x > canvas.width) p.x = 0;
+        if (p.y < 0) p.y = canvas.height;
+        if (p.y > canvas.height) p.y = 0;
 
-      // Calculate particle morph target coordinates
-      particles.forEach((p, idx) => {
-        let tx = canvas.width / 2;
-        let ty = canvas.height / 2;
-
-        if (morphState === "droplet") {
-          // Teardrop / Water Droplet shape formula
-          const t = (idx / numParticles) * Math.PI * 2;
-          const R = 80;
-          tx = canvas.width / 2 + R * Math.sin(t) * (1 - Math.cos(t)) * 0.8;
-          ty = canvas.height / 2 - R * Math.cos(t) - 20;
-          // Wobble effect
-          tx += Math.sin(time + idx) * 3;
-          ty += Math.cos(time - idx) * 3;
-        } else if (morphState === "river") {
-          // River wave layout
-          const ratio = idx / numParticles;
-          tx = ratio * canvas.width;
-          ty = canvas.height / 2 + Math.sin(ratio * Math.PI * 3 + time) * 40;
-        } else if (morphState === "pipeline") {
-          // Pipeline grid layout (branches)
-          const row = idx % 4;
-          const col = Math.floor(idx / 4);
-          tx = 50 + col * 12;
-          ty = 60 + row * 60 + Math.sin(time + col) * 10;
-        } else if (morphState === "logo") {
-          // Letter 'H' shape (for HydroBS)
-          const ratio = idx / numParticles;
-          if (ratio < 0.4) {
-            // Left vertical leg
-            tx = canvas.width / 2 - 60;
-            ty = 80 + (ratio / 0.4) * 160;
-          } else if (ratio < 0.8) {
-            // Right vertical leg
-            tx = canvas.width / 2 + 60;
-            ty = 80 + ((ratio - 0.4) / 0.4) * 160;
-          } else {
-            // Horizontal bar
-            tx = canvas.width / 2 - 60 + ((ratio - 0.8) / 0.2) * 120;
-            ty = 160;
-          }
-        }
-
-        p.targetX = tx;
-        p.targetY = ty;
-
-        // Physics-based tracking with spring inertia
-        const dx = p.targetX - p.x;
-        const dy = p.targetY - p.y;
-        p.vx += dx * 0.08;
-        p.vy += dy * 0.08;
-        p.vx *= 0.82;
-        p.vy *= 0.82;
-
-        // Repel force simulation when mouse is nearby
-        if (mouse.active) {
-          const mdx = p.x - mouse.x;
-          const mdy = p.y - mouse.y;
-          const dist = Math.sqrt(mdx * mdx + mdy * mdy);
-          if (dist < 80) {
-            const force = (80 - dist) / 80;
-            p.vx += (mdx / dist) * force * 15;
-            p.vy += (mdy / dist) * force * 15;
-          }
-        }
-
-        p.x += p.vx;
-        p.y += p.vy;
-
-        // Draw particle with the new twilight sky palette
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        
-        if (idx % 3 === 0) {
-          ctx.fillStyle = `rgba(57, 198, 252, ${p.alpha})`; // Cyan Sky (#39C6FC)
-        } else if (idx % 3 === 1) {
-          ctx.fillStyle = `rgba(29, 130, 224, ${p.alpha})`; // Twilight Blue (#1D82E0)
-        } else {
-          ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`; // Pure White
-        }
+        ctx.fillStyle = `rgba(0, 180, 216, ${p.alpha})`;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = "#00B4D8";
         ctx.fill();
-
-        // Trace subtle connecting threads between adjacent particles
-        if (idx > 0 && idx < numParticles - 1 && morphState === "logo") {
-          const dist = Math.sqrt(Math.pow(p.x - particles[idx - 1].x, 2) + Math.pow(p.y - particles[idx - 1].y, 2));
-          if (dist < 40) {
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(particles[idx - 1].x, particles[idx - 1].y);
-            ctx.strokeStyle = `rgba(57, 198, 252, ${0.15 - dist / 300})`;
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          }
-        }
       });
 
       animId = requestAnimationFrame(render);
     };
 
     render();
-    return () => {
-      cancelAnimationFrame(animId);
-      canvas.removeEventListener("mousemove", handleMouseMove);
-      canvas.removeEventListener("mouseleave", handleMouseLeave);
-    };
+
+    return () => cancelAnimationFrame(animId);
   }, []);
 
-  // Background fluid wave effect with twilight sky gradient
-  useEffect(() => {
-    const canvas = backgroundCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let animId: number;
-    let time = 0;
-
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener("resize", resize);
-
-    const render = () => {
-      time += 0.008;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.save();
-      const waveCount = 3;
-      for (let w = 0; w < waveCount; w++) {
-        ctx.beginPath();
-        const amplitude = 40 + w * 20;
-        const frequency = 0.001 - w * 0.0002;
-        const offset = w * 3 + time;
-
-        ctx.moveTo(0, canvas.height);
-        for (let x = 0; x <= canvas.width; x += 15) {
-          const y = canvas.height - 300 + Math.sin(x * frequency + offset) * amplitude + Math.cos(x * 0.003 - offset) * 15;
-          ctx.lineTo(x, y);
-        }
-        ctx.lineTo(canvas.width, canvas.height);
-        ctx.closePath();
-
-        const grad = ctx.createLinearGradient(0, canvas.height - 400, 0, canvas.height);
-        if (w === 0) {
-          grad.addColorStop(0, "rgba(57, 198, 252, 0.04)"); // Cyan Sky
-          grad.addColorStop(1, "rgba(10, 59, 117, 0.85)"); // Deep Sky Blue (#0A3B75)
-        } else if (w === 1) {
-          grad.addColorStop(0, "rgba(29, 130, 224, 0.06)"); // Twilight Blue
-          grad.addColorStop(1, "rgba(7, 44, 86, 0.7)"); // Dark Navy Blue
-        } else {
-          grad.addColorStop(0, "rgba(255, 255, 255, 0.02)");
-          grad.addColorStop(1, "rgba(10, 59, 117, 0.95)");
-        }
-
-        ctx.fillStyle = grad;
-        ctx.fill();
-      }
-      ctx.restore();
-
-      animId = requestAnimationFrame(render);
-    };
-
-    render();
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener("resize", resize);
-    };
-  }, []);
+  const handleDemoSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!demoEmail.trim()) return;
+    setDemoRequested(true);
+  };
 
   return (
-    <div className="min-h-screen bg-[#FFFFFF] text-[#1E293B] selection:bg-[#39C6FC]/30 overflow-x-hidden relative font-sans">
+    <div className="bg-[#04101E] text-[#F0F9FF] font-sans antialiased selection:bg-[#00B4D8] selection:text-white min-h-screen">
       
-      {/* 1. UPPER SECTION: Immersive Twilight Sky gradient zone */}
-      <div className="relative bg-gradient-to-b from-[#0A3B75] via-[#105CA6] to-[#1E82E0] text-white pb-24">
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#FFFFFF] to-transparent pointer-events-none" />
-        <div className="absolute top-[20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-[#39C6FC]/10 blur-[160px] pointer-events-none" />
-        <div className="absolute bottom-[10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-[#1D82E0]/15 blur-[180px] pointer-events-none" />
-        
-        {/* Ambient backdrop canvas */}
-        <canvas ref={backgroundCanvasRef} className="absolute inset-0 pointer-events-none -z-10" />
-
-        {/* Premium Navbar */}
-        <nav className="fixed top-0 inset-x-0 h-20 bg-[#0A3B75]/60 backdrop-blur-2xl border-b border-white/10 z-30 transition-all select-none">
-          <div className="max-w-7xl mx-auto h-full px-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#39C6FC] to-[#1D82E0] flex items-center justify-center shadow-lg shadow-[#39C6FC]/20 border border-white/10">
-                <Droplet className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <span className="text-xl font-black tracking-wider text-white">HydroBS</span>
-                <span className="block text-[8px] tracking-widest text-[#39C6FC] uppercase font-bold">Smart Utility</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-6">
-              <Link to="/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">
-                Sign In
-              </Link>
-              <Link
-                to="/login"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#39C6FC] to-[#1D82E0] text-white text-xs font-bold rounded-lg shadow-lg hover:shadow-[#1D82E0]/20 transition-all hover:scale-105 border border-white/10"
-              >
-                Get Started
-              </Link>
-            </div>
-          </div>
-        </nav>
-
-        {/* Hero section */}
-        <section className="relative pt-36 max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center z-10">
+      {/* Loader */}
+      <AnimatePresence>
+        {openingPhase === "loading" && (
           <motion.div 
-            style={{ opacity: textOpacity }}
-            className="space-y-8 text-left"
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8 }}
+            className="fixed inset-0 z-50 bg-[#04101E] flex items-center justify-center"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-[#39C6FC] text-xs font-semibold tracking-wider uppercase">
-              <Waves className="w-3.5 h-3.5 animate-pulse" />
-              Interactive Vector Mesh Ingestion
-            </div>
-
-            <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-none text-white uppercase">
-              Smart Water Management <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#39C6FC] via-[#F5FAFC] to-[#39C6FC]">
-                for Smarter Communities.
-              </span>
-            </h1>
-
-            <p className="max-w-xl text-md md:text-lg text-slate-200 leading-relaxed font-light">
-              An intelligent enterprise utility dashboard. Monitor water telemetry in real-time, 
-              detect leakages with statistical parameters, and automate community cost distribution.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <Link
-                to="/login"
-                className="group inline-flex items-center gap-2.5 px-8 py-4 bg-gradient-to-r from-[#39C6FC] to-[#1D82E0] text-white font-bold rounded-xl shadow-xl shadow-[#1D82E0]/20 hover:shadow-[#39C6FC]/30 transition-all hover:scale-105 border border-white/10"
-              >
-                Get Started
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link
-                to="/register/admin"
-                className="inline-flex items-center gap-2 px-8 py-4 bg-white/10 border border-white/25 hover:border-[#39C6FC]/50 text-white rounded-xl transition-all"
-              >
-                Explore Platform
-              </Link>
+            <div className="text-center space-y-3">
+              <span className="font-serif text-3xl tracking-[0.4em] text-[#E0F7FA] block uppercase">HYDROBS</span>
+              <div className="h-0.5 w-32 bg-[#00B4D8]/30 mx-auto overflow-hidden rounded-full">
+                <motion.div 
+                  initial={{ x: "-100%" }}
+                  animate={{ x: "100%" }}
+                  transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
+                  className="h-full w-full bg-[#00B4D8]"
+                />
+              </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* 3D Morphing Canvas */}
-          <div className="relative h-[400px] w-full flex items-center justify-center rounded-3xl bg-[#0A3B75]/40 backdrop-blur-md border border-white/10 shadow-2xl overflow-hidden">
-            <div className="absolute top-4 left-6 flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[#39C6FC] animate-ping" />
-              <span className="text-[10px] text-[#39C6FC] font-bold uppercase tracking-widest">Dynamic Particle Vector Grid</span>
+      {/* Luxury Navigation Bar */}
+      <nav className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-6 md:px-16 py-6 bg-gradient-to-b from-[#04101E]/95 to-transparent backdrop-blur-md border-b border-[#00B4D8]/15">
+        <Link to="/" className="font-serif font-bold text-xl md:text-2xl tracking-[0.3em] text-[#E0F7FA] flex items-center gap-3">
+          <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-[#0077B6] to-[#00B4D8] flex items-center justify-center shadow-lg shadow-[#00B4D8]/30">
+            <Droplet className="h-4.5 w-4.5 text-white" />
+          </div>
+          HYDROBS
+        </Link>
+        
+        <div className="hidden md:flex items-center gap-8 text-[11px] font-semibold tracking-[0.2em] uppercase text-sky-200">
+          <a href="#features" className="hover:text-[#00B4D8] transition-colors">Platform</a>
+          <a href="#tariff" className="hover:text-[#00B4D8] transition-colors">Tiered Tariff</a>
+          <a href="#procurement" className="hover:text-[#00B4D8] transition-colors">Bulk Procurement</a>
+          <a href="#portals" className="hover:text-[#00B4D8] transition-colors">Stakeholders</a>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <Link 
+            to="/login"
+            className="text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-full border border-[#00B4D8]/50 hover:border-[#00B4D8] text-[#00B4D8] hover:bg-[#00B4D8] hover:text-[#04101E] transition-all shadow-sm"
+          >
+            Sign In
+          </Link>
+          <Link 
+            to="/register"
+            className="hidden sm:inline-flex text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-full bg-gradient-to-r from-[#0077B6] to-[#00B4D8] text-white hover:shadow-lg hover:shadow-[#00B4D8]/30 transition-all cursor-pointer"
+          >
+            Get Started
+          </Link>
+        </div>
+      </nav>
+
+      {/* COLD OPEN HERO SECTION */}
+      <header className="relative min-h-screen flex items-center justify-center text-center px-6 pt-24 pb-16 overflow-hidden bg-radial from-[#023E8A]/30 via-[#04101E] to-[#04101E]">
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=2000&q=80" 
+            alt="HydroBS Smart Water Grid" 
+            className="w-full h-full object-cover opacity-20 scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#04101E]/60 via-[#04101E]/80 to-[#04101E]" />
+        </div>
+
+        <canvas ref={canvasRef} width={1200} height={800} className="absolute inset-0 z-0 pointer-events-none opacity-60" />
+
+        <div className="relative z-10 max-w-4xl mx-auto space-y-8">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 0.2 }}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-[#c79a52]/40 text-[#c79a52] text-xs uppercase tracking-[0.3em] font-semibold"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Residential Water Governance Platform
+          </motion.div>
+
+          <motion.h1 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.2, delay: 0.4 }}
+            className="font-serif font-normal text-4xl sm:text-6xl md:text-7xl lg:text-8xl leading-none text-[#f5f0e6]"
+          >
+            Water Intelligence, <br />
+            <em className="italic text-[#00B4D8] font-serif">Perfected.</em>
+          </motion.h1>
+
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 0.6 }}
+            className="text-slate-300 font-light text-base sm:text-xl max-w-2xl mx-auto leading-relaxed"
+          >
+            Automated sub-meter telemetry, 2-tier progressive tariff engines, and bulk tanker procurement tracking engineered for modern apartments & residential communities.
+          </motion.p>
+
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 0.8 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
+          >
+            <Link 
+              to="/register"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] text-white font-extrabold text-xs uppercase tracking-[0.2em] shadow-xl shadow-[#00B4D8]/20 hover:scale-105 transition-all"
+            >
+              Onboard Community <ArrowRight className="h-4 w-4" />
+            </Link>
+            <a 
+              href="#features"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-white/5 hover:bg-white/10 text-white font-semibold text-xs uppercase tracking-[0.2em] border border-white/10 transition-all"
+            >
+              Explore Telemetry
+            </a>
+          </motion.div>
+
+          <div className="pt-12 grid grid-cols-2 sm:grid-cols-4 gap-6 border-t border-white/10 max-w-3xl mx-auto text-left">
+            <div>
+              <span className="block font-serif text-3xl text-[#00B4D8] font-bold">12,400+</span>
+              <span className="text-[10px] text-slate-400 uppercase tracking-widest">Active Meters</span>
             </div>
-            <canvas ref={canvasRef} width={450} height={380} className="w-full h-full" />
-            <div className="absolute bottom-6 flex justify-center w-full">
-              <span className="text-[10px] text-slate-300 font-medium">Scroll down to morph particles</span>
+            <div>
+              <span className="block font-serif text-3xl text-[#c79a52] font-bold">99.9%</span>
+              <span className="text-[10px] text-slate-400 uppercase tracking-widest">Billing Accuracy</span>
+            </div>
+            <div>
+              <span className="block font-serif text-3xl text-emerald-400 font-bold">47+</span>
+              <span className="text-[10px] text-slate-400 uppercase tracking-widest">Estates Onboarded</span>
+            </div>
+            <div>
+              <span className="block font-serif text-3xl text-purple-400 font-bold">Instant</span>
+              <span className="text-[10px] text-slate-400 uppercase tracking-widest">Razorpay Checkout</span>
             </div>
           </div>
-        </section>
+        </div>
+      </header>
 
-        {/* 2. Interactive Pipeline & Storytelling Section */}
-        <section ref={storytellingRef} className="pt-24 relative overflow-hidden">
-          <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            
-            <div className="space-y-6 text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-[#39C6FC] text-xs font-bold uppercase border border-white/10">
-                <Sparkles className="w-3.5 h-3.5" /> Interactive Scroll Story
+      {/* PLATFORM OVERVIEW INTRO */}
+      <section id="features" className="py-24 px-6 md:px-16 max-w-7xl mx-auto space-y-16">
+        <div className="text-center space-y-4 max-w-3xl mx-auto">
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#00B4D8]">The Core Architecture</span>
+          <h2 className="font-serif text-3xl md:text-5xl font-normal leading-tight text-[#f5f0e6]">
+            Complete Water Control for <br />
+            <em className="italic text-[#00B4D8]">Every Estate Stakeholder</em>
+          </h2>
+          <p className="text-slate-400 text-sm md:text-base font-light">
+            HydroBS bridges smart sub-metering hardware, progressive tariff billing, and resident portals into a single real-time console.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {[
+            {
+              icon: Activity,
+              title: "Sub-Second Telemetry",
+              desc: "Automated flow rate measurement, index tracking, and leak alert algorithms for individual apartment lines.",
+              tag: "Real-Time Hardware Sync"
+            },
+            {
+              icon: TrendingUp,
+              title: "Tiered Tariff Billing Engine",
+              desc: "Progressive 2-tier slab pricing (Base rate for first 10 kL + Higher Rate for excess usage) calculated automatically per flat.",
+              tag: "Automated Invoicing"
+            },
+            {
+              icon: ShoppingCart,
+              title: "Bulk Procurement Module",
+              desc: "Log water tanker deliveries & municipal supply invoices, computing per-cycle volume and unit cost analytics.",
+              tag: "Procurement Ledger"
+            }
+          ].map((item, idx) => (
+            <div 
+              key={idx}
+              className="bg-white/5 border border-white/10 rounded-3xl p-8 space-y-6 hover:border-[#00B4D8]/50 transition-all group"
+            >
+              <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-[#00B4D8]/20 to-[#0F4C81]/20 border border-[#00B4D8]/30 flex items-center justify-center text-[#00B4D8] group-hover:scale-110 transition-transform">
+                <item.icon className="h-6 w-6" />
               </div>
-              <h2 className="text-4xl md:text-5xl font-black text-white leading-tight">
-                One Water Droplet <br />
-                Pulsing Through City Grids.
-              </h2>
-              <p className="text-slate-200 font-light leading-relaxed">
-                As water flows from reservoir channels, HydroBS pipes monitor telemetry flow readings. 
-                Data branches into apartment grids, enabling localized z-score computations to instantly notify flat residents.
-              </p>
-
-              <div className="space-y-4 pt-4 border-l border-white/15 pl-6">
-                <div className="flex items-start gap-4">
-                  <div className="h-6 w-6 rounded-full bg-white/10 text-[#39C6FC] flex items-center justify-center text-xs font-bold shrink-0">1</div>
-                  <p className="text-xs text-slate-300 font-light"><strong className="text-white">Water Ingestion:</strong> Bulk municipal deliveries logged.</p>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="h-6 w-6 rounded-full bg-white/10 text-[#39C6FC] flex items-center justify-center text-xs font-bold shrink-0">2</div>
-                  <p className="text-xs text-slate-300 font-light"><strong className="text-white">Pipeline Branching:</strong> Telemetry flow parameters logged via CSV uploads.</p>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="h-6 w-6 rounded-full bg-white/10 text-[#39C6FC] flex items-center justify-center text-xs font-bold shrink-0">3</div>
-                  <p className="text-xs text-slate-300 font-light"><strong className="text-white">Community Alert:</strong> High-usage anomalies trigger warnings.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Glowing Wireframe Pipeline simulation */}
-            <div className="bg-[#0A3B75]/40 backdrop-blur-md border border-white/15 rounded-3xl p-8 shadow-2xl relative min-h-[380px] flex flex-col justify-between">
-              <div className="absolute inset-0 bg-radial from-[#39C6FC]/5 via-transparent to-transparent -z-10" />
-              <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Telemetry Pipe Grid</span>
-                <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold uppercase">
-                  <Activity className="w-3.5 h-3.5 animate-pulse" /> Live Telemetry
-                </span>
-              </div>
-
-              {/* Glowing pipeline nodes */}
-              <div className="grid grid-cols-4 gap-4 py-8">
-                {[
-                  { name: "Reservoir Node", color: "text-[#39C6FC] bg-white/10 border border-white/20" },
-                  { name: "Main Feed", color: "text-[#39C6FC] bg-white/10 border border-[#39C6FC]/25" },
-                  { name: "Slab Allocation", color: "text-slate-400 bg-white/5 border border-white/5" },
-                  { name: "Flat Flow", color: "text-white bg-[#1D82E0]/40 border border-[#39C6FC]/20" }
-                ].map((node, idx) => (
-                  <div key={idx} className="bg-white/5 border border-white/5 p-3 rounded-2xl text-center space-y-3 relative">
-                    <div className="flex justify-center">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center ${node.color}`}>
-                        <Cpu className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <span className="block text-[9px] text-slate-300 font-bold uppercase">{node.name}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-white/5 p-4 border border-white/10 rounded-2xl flex justify-between items-center text-xs">
-                <span className="text-slate-300">Total Consumption:</span>
-                <span className="font-mono text-[#39C6FC] font-bold">4,821,900 Litres</span>
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#c79a52]">{item.tag}</span>
+                <h3 className="font-serif text-xl font-bold text-[#f5f0e6]">{item.title}</h3>
+                <p className="text-xs text-slate-400 leading-relaxed font-light">{item.desc}</p>
               </div>
             </div>
-          </div>
-        </section>
+          ))}
+        </div>
+      </section>
 
-        {/* 3. High-Fidelity Interface Review Carousel */}
-        <section className="py-24 max-w-7xl mx-auto px-6 space-y-12">
-          <div className="text-center space-y-4 max-w-2xl mx-auto">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-white text-xs font-bold uppercase border border-white/20">
-              <Layers className="w-3.5 h-3.5" /> Unified Dashboard Layouts
-            </span>
-            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight">
-              Integrated Console Views
+      {/* TIERED TARIFF ENGINE SHOWCASE */}
+      <section id="tariff" className="py-24 bg-[#0B192C]/60 border-y border-[#00B4D8]/15 px-6 md:px-16">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="space-y-6">
+            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#c79a52]">Progressive Billing Rules</span>
+            <h2 className="font-serif text-3xl md:text-5xl font-normal leading-tight text-[#f5f0e6]">
+              Tiered Tariff Engine & <br />
+              <em className="italic text-[#00B4D8]">Fair Water Allocation</em>
             </h2>
-            <p className="text-slate-200 font-light leading-relaxed">
-              Explore tailored viewports that satisfy every stakeholder in the smart water ecosystem.
+            <p className="text-slate-300 text-sm leading-relaxed font-light">
+              Eliminate flat-rate water wastage with automated 2-tier slab tariffs stored per community. Encourage conservation while maintaining guaranteed floor charges.
+            </p>
+
+            <div className="space-y-4 pt-4">
+              <div className="p-4 rounded-2xl bg-white/5 border border-cyan-500/20 flex justify-between items-center">
+                <div>
+                  <span className="text-xs font-bold text-white block">Tier 1: Base Consumption Slab</span>
+                  <span className="text-[10px] text-slate-400">First 0 - 10 kL (10,000 Litres)</span>
+                </div>
+                <span className="text-sm font-extrabold text-[#00B4D8]">₹5.00 / Litre</span>
+              </div>
+              <div className="p-4 rounded-2xl bg-white/5 border border-purple-500/20 flex justify-between items-center">
+                <div>
+                  <span className="text-xs font-bold text-white block">Tier 2: Excess Usage Penalty Slab</span>
+                  <span className="text-[10px] text-slate-400">Beyond 10 kL (&gt; 10,000 Litres)</span>
+                </div>
+                <span className="text-sm font-extrabold text-purple-400">₹8.00 / Litre</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[#0B192C] border border-[#00B4D8]/20 rounded-3xl p-8 shadow-2xl space-y-6">
+            <div className="flex justify-between items-center border-b border-white/10 pb-4">
+              <span className="text-xs font-bold text-white uppercase tracking-wider">Live Tariff Simulator</span>
+              <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">Recalculating...</span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between py-2 border-b border-white/5 text-slate-400">
+                <span>Sample Household Usage:</span>
+                <span className="font-bold text-white font-mono">12,450 Litres (12.45 kL)</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-white/5 text-slate-400">
+                <span>Tier 1 Charge (10,000 L @ ₹5/L):</span>
+                <span className="font-bold text-[#00B4D8]">₹50,000.00</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-white/5 text-slate-400">
+                <span>Tier 2 Charge (2,450 L @ ₹8/L):</span>
+                <span className="font-bold text-purple-400">₹19,600.00</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-white/5 text-slate-400">
+                <span>Fixed Infrastructure Service Charge:</span>
+                <span className="font-bold text-emerald-400">₹50.00</span>
+              </div>
+              <div className="flex justify-between pt-3 text-sm font-extrabold text-white">
+                <span>Calculated Net Bill Amount:</span>
+                <span className="text-[#00B4D8] font-mono">₹69,650.00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* BULK WATER PROCUREMENT MODULE */}
+      <section id="procurement" className="py-24 px-6 md:px-16 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="bg-[#0B192C] border border-[#00B4D8]/20 rounded-3xl p-8 shadow-2xl space-y-6 order-2 lg:order-1">
+            <div className="flex justify-between items-center border-b border-white/10 pb-4">
+              <span className="text-xs font-bold text-white uppercase tracking-wider">Procurement Delivery Ledger</span>
+              <span className="text-[10px] text-[#00B4D8] font-bold">Tanker & Municipal</span>
+            </div>
+            
+            <div className="space-y-3">
+              {[
+                { date: "2026-07-22", type: "Tanker Delivery", volume: "12,000 L", cost: "₹6,000.00", unitCost: "₹0.50/L (₹500/kL)" },
+                { date: "2026-07-20", type: "Municipal Supply", volume: "55,000 L", cost: "₹22,000.00", unitCost: "₹0.40/L (₹400/kL)" },
+                { date: "2026-07-18", type: "Tanker Delivery", volume: "10,000 L", cost: "₹5,200.00", unitCost: "₹0.52/L (₹520/kL)" }
+              ].map((p, idx) => (
+                <div key={idx} className="p-4 rounded-2xl bg-white/5 border border-white/5 flex justify-between items-center text-xs">
+                  <div>
+                    <span className="font-bold text-white block">{p.type}</span>
+                    <span className="text-[10px] text-slate-400">{p.date} &bull; {p.volume}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-extrabold text-[#00B4D8] block">{p.cost}</span>
+                    <span className="text-[10px] text-purple-400">{p.unitCost}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-6 order-1 lg:order-2">
+            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#00B4D8]">Procurement Analytics</span>
+            <h2 className="font-serif text-3xl md:text-5xl font-normal leading-tight text-[#f5f0e6]">
+              Bulk Water Procurement & <br />
+              <em className="italic text-[#00B4D8]">Supplier Delivery Audits</em>
+            </h2>
+            <p className="text-slate-300 text-sm leading-relaxed font-light">
+              Track apartment water inflow from tanker suppliers, municipal bulk connections, and groundwater sources. Audit unit costs per cycle to minimize community operational overhead.
             </p>
           </div>
+        </div>
+      </section>
 
-          {/* Toggle buttons */}
-          <div className="flex justify-center border-b border-white/10 max-w-lg mx-auto pb-px">
+      {/* PORTALS & STAKEHOLDERS */}
+      <section id="portals" className="py-24 bg-[#143230]/40 border-t border-white/5 px-6 md:px-16">
+        <div className="max-w-7xl mx-auto space-y-16">
+          <div className="text-center space-y-4 max-w-2xl mx-auto">
+            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#c79a52]">Role-Based Architecture</span>
+            <h2 className="font-serif text-3xl md:text-5xl font-normal text-[#f5f0e6]">Unified Portals</h2>
+          </div>
+
+          <div className="flex justify-center border-b border-white/10 max-w-md mx-auto">
             {[
               { id: "super", label: "Super Admin" },
               { id: "admin", label: "Community Admin" },
@@ -506,320 +414,83 @@ export default function LandingPage() {
               <button
                 key={tab.id}
                 onClick={() => setActivePreviewTab(tab.id as any)}
-                className={`flex-1 py-3 text-sm font-bold border-b-2 transition-all relative ${
+                className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
                   activePreviewTab === tab.id 
-                    ? "text-[#39C6FC] border-[#39C6FC]" 
-                    : "text-slate-300 border-transparent hover:text-white"
+                    ? "text-[#00B4D8] border-[#00B4D8]" 
+                    : "text-slate-400 border-transparent hover:text-white"
                 }`}
               >
                 {tab.label}
-                {activePreviewTab === tab.id && (
-                  <motion.div 
-                    layoutId="tabPreviewIndicator4"
-                    className="absolute bottom-0 inset-x-0 h-0.5 bg-[#39C6FC]"
-                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                  />
-                )}
               </button>
             ))}
           </div>
 
-          {/* Dashboard View Panel */}
-          <div className="max-w-5xl mx-auto bg-[#0A3B75]/40 backdrop-blur-md border border-white/15 rounded-3xl p-6 shadow-2xl relative min-h-[380px]">
-            <div className="absolute inset-0 bg-radial from-[#39C6FC]/5 via-transparent to-transparent rounded-3xl pointer-events-none -z-10" />
-            
-            <AnimatePresence mode="wait">
-              {activePreviewTab === "super" && (
-                <motion.div
-                  key="super"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  className="space-y-6 text-left"
-                >
-                  <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                    <div>
-                      <h4 className="text-lg font-bold text-white uppercase">Super Admin View</h4>
-                      <p className="text-xs text-slate-300 font-light">Global community mappings and telemetry sync logs.</p>
-                    </div>
-                    <span className="px-2.5 py-1 bg-white/10 text-[#39C6FC] text-xs font-bold rounded-full border border-white/20 uppercase">
-                      Global Control
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    <div className="bg-white/5 border border-white/5 p-5 rounded-2xl space-y-2 shadow-inner">
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Total Communities</span>
-                      <p className="text-3xl font-black text-white">12 Registered</p>
-                    </div>
-                    <div className="bg-white/5 border border-white/5 p-5 rounded-2xl space-y-2 shadow-inner">
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Global Paid Bills</span>
-                      <p className="text-3xl font-black text-emerald-400">₹8,42,000</p>
-                    </div>
-                    <div className="bg-white/5 border border-white/5 p-5 rounded-2xl space-y-2 shadow-inner">
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">System Health</span>
-                      <p className="text-3xl font-black text-[#39C6FC]">100% Online</p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {activePreviewTab === "admin" && (
-                <motion.div
-                  key="admin"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  className="space-y-6 text-left"
-                >
-                  <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                    <div>
-                      <h4 className="text-lg font-bold text-white uppercase">Community Admin Console</h4>
-                      <p className="text-xs text-slate-300 font-light">Manage residents, upload indexes, audit pipelines.</p>
-                    </div>
-                    <span className="px-2.5 py-1 bg-white/10 text-[#39C6FC] text-xs font-bold rounded-full border border-white/20 uppercase">
-                      Estate Admin
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    <div className="bg-white/5 border border-white/5 p-5 rounded-2xl space-y-2 shadow-inner">
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Active Billing Cycle</span>
-                      <p className="text-2xl font-bold text-white">July 2026 Run</p>
-                      <span className="inline-block text-[9px] px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded-full border border-blue-500/20">ACTIVE</span>
-                    </div>
-                    <div className="bg-white/5 border border-white/5 p-5 rounded-2xl space-y-2 shadow-inner">
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Pending Join Requests</span>
-                      <p className="text-3xl font-black text-amber-500">3 Requests</p>
-                    </div>
-                    <div className="bg-white/5 border border-white/5 p-5 rounded-2xl space-y-2 shadow-inner">
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Bulk Tanks Logged</span>
-                      <p className="text-3xl font-black text-white">4 Tankers</p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {activePreviewTab === "resident" && (
-                <motion.div
-                  key="resident"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  className="space-y-6 text-left"
-                >
-                  <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                    <div>
-                      <h4 className="text-lg font-bold text-white uppercase">Resident Portal View</h4>
-                      <p className="text-xs text-slate-300 font-light">Monitor household balance, download bills, review leak alerts.</p>
-                    </div>
-                    <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20 uppercase">
-                      Homeowner Flat 402
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    <div className="bg-white/5 border border-white/5 p-5 rounded-2xl space-y-2 shadow-inner">
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Water Score Rank</span>
-                      <p className="text-3xl font-black text-emerald-400">92 / 100</p>
-                      <span className="text-[10px] text-slate-300">A+ Conservation Level</span>
-                    </div>
-                    <div className="bg-white/5 border border-white/5 p-5 rounded-2xl space-y-2 shadow-inner">
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Current Month Dues</span>
-                      <p className="text-3xl font-black text-white">₹850.00</p>
-                      <span className="text-[10px] text-slate-300">Invoice ready</span>
-                    </div>
-                    <div className="bg-white/5 border border-white/5 p-5 rounded-2xl space-y-2 shadow-inner">
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Consumption Today</span>
-                      <p className="text-3xl font-black text-white">180 Litres</p>
-                      <span className="text-[10px] text-slate-300">Community Avg: 210 L</span>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-amber-500/5 border border-amber-500/15 rounded-2xl flex gap-3 items-start">
-                    <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                    <div className="space-y-1">
-                      <p className="text-xs font-bold text-white">Z-Score Leak Alert Warning</p>
-                      <p className="text-[11px] text-slate-200 leading-normal font-light">
-                        We detected a statistical flow deviation (Z-score: 2.1) on your meter lines during night cycles. Please check internal pipes.
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </section>
-      </div>
-
-      {/* 2. LOWER SECTION: Clean Minimalist White Layout area */}
-      <div className="bg-white text-[#1E293B] relative pb-28">
-        
-        {/* Subtle grid lines background pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-30 pointer-events-none" />
-
-        {/* 4. Water Conservation Scene */}
-        <section className="py-24 relative text-center">
-          <div className="max-w-4xl mx-auto px-6 space-y-8">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1D82E0]/10 text-[#1D82E0] text-xs font-bold uppercase border border-[#1D82E0]/20">
-              <Sparkles className="w-3.5 h-3.5" /> Ecological Action
-            </div>
-            <h2 className="text-4xl md:text-5xl font-black text-[#0A3B75] uppercase leading-tight">
-              Making Communities Greener, <br />
-              One Drop at a Time.
-            </h2>
-            <p className="text-[#475569] font-light leading-relaxed max-w-2xl mx-auto">
-              Toggle conservation mode to simulate leak detection. See how reducing water waste stabilized localized water levels and restored ecological balance.
-            </p>
-
-            <div className="pt-4 flex justify-center">
-              <button
-                onClick={() => setIsConservationActive(!isConservationActive)}
-                className={`px-8 py-4 rounded-xl font-bold transition-all shadow-lg hover:scale-105 ${
-                  isConservationActive 
-                    ? "bg-[#1D82E0] text-white shadow-[#1D82E0]/20" 
-                    : "bg-[#F8FAFC] text-[#475569] border border-slate-200"
-                }`}
-              >
-                {isConservationActive ? "Leak Detection: ON (Stabilized)" : "Leak Detection: OFF (Unmitigated)"}
-              </button>
-            </div>
-
-            {/* Simulated environmental layout */}
-            <div className="mt-12 bg-[#F8FAFC] border border-slate-200 rounded-3xl p-8 relative overflow-hidden min-h-[220px] flex flex-col justify-center items-center shadow-md">
-              <div className="absolute inset-0 bg-radial from-[#39C6FC]/5 via-transparent to-transparent -z-10" />
-              
-              <AnimatePresence mode="wait">
-                {isConservationActive ? (
-                  <motion.div
-                    key="active-conserve"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="space-y-4 text-center"
-                  >
-                    <div className="flex justify-center">
-                      <div className="h-14 w-14 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-500 border border-emerald-500/25">
-                        <CheckCircle2 className="w-8 h-8 animate-pulse" />
-                      </div>
-                    </div>
-                    <h4 className="text-lg font-bold text-[#0A3B75] uppercase">System Restored</h4>
-                    <p className="text-xs text-emerald-600 font-light">Underground leakage fixed. Water table stabilized. Grid telemetry safe.</p>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="inactive-conserve"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="space-y-4 text-center"
-                  >
-                    <div className="flex justify-center">
-                      <div className="h-14 w-14 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-500 border border-amber-500/25">
-                        <AlertTriangle className="w-8 h-8 animate-bounce" />
-                      </div>
-                    </div>
-                    <h4 className="text-lg font-bold text-[#0A3B75] uppercase">Wastage Detected</h4>
-                    <p className="text-xs text-amber-600 font-light">Unresolved night flows indicating pipeline leakages on Flat 402 lines.</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
-        </section>
-
-        {/* 5. Feature Grid */}
-        <section className="py-24 max-w-7xl mx-auto px-6 space-y-16">
-          <div className="text-center space-y-4 max-w-2xl mx-auto">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1D82E0]/10 text-[#0A3B75] text-xs font-bold uppercase border border-[#1D82E0]/25">
-              <Award className="w-3.5 h-3.5" /> Built for smart cities
-            </span>
-            <h2 className="text-4xl md:text-5xl font-black text-[#0A3B75] uppercase leading-tight">
-              Designed for smart communities
-            </h2>
-            <p className="text-[#475569] font-light leading-relaxed">
-              HydroBS brings transparency, data consistency, and advanced metrics to modern estate management.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((f, idx) => (
-              <div 
-                key={f.title}
-                className="group p-6 bg-white border border-slate-100 rounded-3xl hover:border-[#1D82E0]/40 transition-all hover:-translate-y-1 duration-300 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-sm hover:shadow-lg shadow-slate-200/50"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-[#F8FAFC]/50 via-transparent to-transparent pointer-events-none -z-10" />
-                
-                <div className="space-y-4 text-left">
-                  <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${f.color} flex items-center justify-center text-white shadow-lg shadow-[#1D82E0]/10`}>
-                    <f.icon className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-lg font-bold text-[#0A3B75] group-hover:text-[#1D82E0] transition-colors uppercase">{f.title}</h3>
-                  <p className="text-xs text-[#475569] leading-relaxed font-light">{f.desc}</p>
-                </div>
+          <div className="max-w-4xl mx-auto bg-[#0c2422] border border-white/10 rounded-3xl p-8 shadow-2xl">
+            {activePreviewTab === "super" && (
+              <div className="space-y-4 text-xs">
+                <h3 className="font-serif text-2xl text-white">Super Admin Global Control</h3>
+                <p className="text-slate-300">Oversee all registered estate communities, system-wide meter telemetry ingestion, and global billing engine runs.</p>
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 6. Action CTA Section */}
-        <section className="py-12 max-w-5xl mx-auto px-6">
-          <div className="bg-gradient-to-br from-[#0A3B75] to-[#1E82E0] border border-[#1D82E0]/20 p-8 md:p-16 rounded-3xl text-center relative overflow-hidden shadow-2xl">
-            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#39C6FC]/40 to-transparent" />
-            <div className="absolute inset-0 bg-[#39C6FC]/5 blur-3xl -z-10 pointer-events-none" />
-            
-            <div className="max-w-2xl mx-auto space-y-8">
-              <h2 className="text-4xl md:text-6xl font-black text-white uppercase leading-tight">
-                Transform Water Management <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#39C6FC] to-[#FFFFFF]">
-                  into Smart Management.
-                </span>
-              </h2>
-              <p className="text-slate-100 font-light leading-relaxed">
-                Experience transparent utility, cost allocation, and water conservation in one unified console.
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-                <Link
-                  to="/login"
-                  className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-[#39C6FC] to-[#1D82E0] text-white font-bold rounded-xl shadow-lg shadow-[#1D82E0]/20 hover:scale-105 transition-all"
-                >
-                  Launch Platform
-                </Link>
-                <Link
-                  to="/register/admin"
-                  className="inline-flex items-center gap-2 px-8 py-4 bg-white/10 border border-white/20 hover:border-[#39C6FC]/45 text-white rounded-xl transition hover:bg-white/20"
-                >
-                  Contact Us
-                </Link>
+            )}
+            {activePreviewTab === "admin" && (
+              <div className="space-y-4 text-xs">
+                <h3 className="font-serif text-2xl text-[#00B4D8]">Community Admin Dashboard</h3>
+                <p className="text-slate-300">Manage resident meter readings, configure 2-tier slab tariffs, issue monthly bills, and log bulk water procurement deliveries.</p>
               </div>
-            </div>
+            )}
+            {activePreviewTab === "resident" && (
+              <div className="space-y-4 text-xs">
+                <h3 className="font-serif text-2xl text-purple-400">Resident Self-Service Console</h3>
+                <p className="text-slate-300">View real-time meter usage graphs, inspect itemized invoice breakdowns, and complete instant online payments via Razorpay.</p>
+              </div>
+            )}
           </div>
-        </section>
+        </div>
+      </section>
 
-      </div>
+      {/* DEMO / RESERVE CTA */}
+      <section className="py-24 px-6 md:px-16 text-center max-w-4xl mx-auto space-y-8">
+        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#00B4D8]">Onboard Your Estate</span>
+        <h2 className="font-serif text-4xl md:text-6xl font-normal text-[#f5f0e6]">
+          Ready to Modernize Your <br />
+          <em className="italic text-[#00B4D8]">Community Water Utility?</em>
+        </h2>
+        <p className="text-slate-300 text-sm max-w-xl mx-auto font-light">
+          Join leading residential communities automating water distribution, progressive tariff calculation, and online billing.
+        </p>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-100 bg-[#F8FAFC] py-12 relative z-20">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8 items-center text-center md:text-left">
-          <div className="flex items-center gap-3 justify-center md:justify-start">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-[#1D82E0] to-[#0A3B75] flex items-center justify-center border border-white/10">
-              <Droplet className="h-4.5 w-4.5 text-white" />
-            </div>
-            <div>
-              <span className="text-md font-bold tracking-wider text-[#0A3B75]">HydroBS</span>
-              <span className="block text-[8px] tracking-widest text-[#1D82E0] uppercase font-bold">Smart Utility</span>
-            </div>
+        {demoRequested ? (
+          <div className="p-6 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-sm max-w-md mx-auto font-bold flex items-center justify-center gap-2">
+            <CheckCircle2 className="h-5 w-5" /> Request received! Our onboarding team will contact you shortly.
           </div>
+        ) : (
+          <form onSubmit={handleDemoSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+            <input 
+              type="email" 
+              placeholder="Enter community email" 
+              value={demoEmail}
+              onChange={(e) => setDemoEmail(e.target.value)}
+              className="flex-1 bg-white/5 border border-white/15 rounded-full px-6 py-3.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#00B4D8]"
+              required
+            />
+            <button 
+              type="submit"
+              className="px-8 py-3.5 rounded-full bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-[#00B4D8]/20 hover:scale-105 transition-all cursor-pointer"
+            >
+              Request Demo
+            </button>
+          </form>
+        )}
+      </section>
 
-          <div className="flex justify-center gap-8 text-xs font-semibold text-[#1D82E0]">
-            <Link to="/login" className="hover:text-[#0A3B75] transition">Sign In</Link>
-            <Link to="/register/resident" className="hover:text-[#0A3B75] transition">Join Community</Link>
-            <Link to="/register/admin" className="hover:text-[#0A3B75] transition">Create Community</Link>
+      {/* FOOTER */}
+      <footer className="border-t border-white/10 py-12 px-6 md:px-16 text-xs text-slate-400">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-3">
+            <div className="h-6 w-6 rounded-md bg-[#00B4D8] flex items-center justify-center text-[#0c2422] font-bold text-xs">H</div>
+            <span className="font-serif font-bold text-sm tracking-widest text-white">HYDROBS</span>
           </div>
-
-          <div className="text-center md:text-right text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-            © 2026 HydroBS. All rights reserved.
-          </div>
+          <div>© 2026 HydroBS Smart Water Utility Platform. All rights reserved.</div>
         </div>
       </footer>
     </div>

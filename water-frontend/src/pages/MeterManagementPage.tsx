@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Plus, Search, Edit2, RotateCw, CheckCircle, XCircle, AlertTriangle, 
-  Trash2, UserPlus, Info, Check, RefreshCw, Layers, Calendar, Disc 
+  Plus, Search, RotateCw, CheckCircle, XCircle, AlertTriangle, 
+  Trash2, UserPlus, Info, RefreshCw, Calendar, Disc 
 } from 'lucide-react';
 import { waterService, type Meter } from '../services/waterService';
 import { residentService } from '../services/residentService';
@@ -38,7 +38,7 @@ export default function MeterManagementPage() {
       setLoading(true);
       const data = await waterService.getMeters(statusFilter === 'ALL' ? undefined : statusFilter);
       setMeters(data);
-    } catch (err: any) {
+    } catch  {
       toast.error('Failed to load water meters.');
     } finally {
       setLoading(false);
@@ -122,7 +122,7 @@ export default function MeterManagementPage() {
       await waterService.toggleMeterStatus(id, nextStatus);
       toast.success(`Meter set to ${nextStatus.toLowerCase()}`);
       fetchMeters();
-    } catch (err) {
+    } catch  {
       toast.error('Failed to change status');
     }
   };
@@ -133,7 +133,7 @@ export default function MeterManagementPage() {
       await waterService.deleteMeter(id);
       toast.success('Meter record removed');
       fetchMeters();
-    } catch (err) {
+    } catch  {
       toast.error('Failed to delete meter');
     }
   };

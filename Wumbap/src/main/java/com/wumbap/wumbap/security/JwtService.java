@@ -24,7 +24,7 @@ public class JwtService {
     public String generateToken(UserDetails userDetails) { return Jwts.builder()
             .subject(userDetails.getUsername())
             .issuedAt(new Date(System.currentTimeMillis()))
-            .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 15)) // 15 minutes
+            .expiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 365)) // 1 year long-lived session
             .signWith(getSignInKey()).compact();
     }
     public boolean isTokenValid(String token, UserDetails userDetails) {

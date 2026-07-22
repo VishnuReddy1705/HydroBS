@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, FileText, Users, Building, CreditCard, Droplet, ArrowRight, X } from 'lucide-react';
+import { Search, Users, CreditCard, Droplet, ArrowRight, X } from 'lucide-react';
 import api from '@/api';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -42,7 +42,7 @@ export default function AnalyticsSearch({ onClose }: AnalyticsSearchProps) {
           (r.flat && r.flat.includes(query))
         ).slice(0, 5)
       });
-    } catch (err) {
+    } catch  {
       toast.error('Global search encountered an error.');
     } finally {
       setLoading(false);

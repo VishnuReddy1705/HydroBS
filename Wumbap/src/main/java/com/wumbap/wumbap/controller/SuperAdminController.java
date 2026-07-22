@@ -2,9 +2,11 @@ package com.wumbap.wumbap.controller;
 
 import com.wumbap.wumbap.entity.*;
 import com.wumbap.wumbap.repository.*;
+import com.wumbap.wumbap.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -29,11 +31,12 @@ public class SuperAdminController {
     private final UploadJobRepository uploadJobRepository;
     private final MeterImportErrorRepository importErrorRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
 
     // --- Communities CRUD ---
 
     @PostMapping("/communities")
-    public ResponseEntity<?> createCommunity(@RequestBody Map<String, Object> req) {
+    public ResponseEntity<?> createCommunity(@RequestBody Map<String, Object> req, Authentication auth) {
         String name = (String) req.get("name");
         if (name == null || name.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Community name is required");
@@ -96,12 +99,13 @@ public class SuperAdminController {
             primaryAdmin.setCommunity(c);
             userRepository.save(primaryAdmin);
         }
+        auditLogService.log(auth.getName(), "SUPER_ADMIN_COMMUNITY_CREATE", "Created community: " + c.getName() + " (#" + c.getId() + ")");
 
         return ResponseEntity.ok(c);
     }
 
     @PutMapping("/communities/{id}")
-    public ResponseEntity<?> updateCommunity(@PathVariable Long id, @RequestBody Map<String, Object> req) {
+    public ResponseEntity<?> updateCommunity(@PathVariable Long id, @RequestBody Map<String, Object> req, Authentication auth) {
         Community c = communityRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Community not found"));
 
@@ -160,12 +164,13 @@ public class SuperAdminController {
         if (req.get("discountRate") != null) c.setDiscountRate(new BigDecimal(req.get("discountRate").toString()));
 
         c = communityRepository.save(c);
+        auditLogService.log(auth.getName(), "SUPER_ADMIN_COMMUNITY_UPDATE", "Updated community: " + c.getName() + " (#" + c.getId() + ")");
         return ResponseEntity.ok(c);
     }
 
     @DeleteMapping("/communities/{id}")
     @Transactional
-    public ResponseEntity<?> deleteCommunity(@PathVariable Long id) {
+    public ResponseEntity<?> deleteCommunity(@PathVariable Long id, Authentication auth) {
         Community c = communityRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Community not found"));
 
@@ -202,6 +207,7 @@ public class SuperAdminController {
         }
 
         communityRepository.delete(c);
+        auditLogService.log(auth.getName(), "SUPER_ADMIN_COMMUNITY_DELETE", "Deleted community: " + c.getName() + " (#" + c.getId() + ")");
         return ResponseEntity.ok("Community deleted successfully");
     }
 
@@ -213,7 +219,7 @@ public class SuperAdminController {
     }
 
     @PostMapping("/users")
-    public ResponseEntity<?> createUser(@RequestBody Map<String, Object> req) {
+    public ResponseEntity<?> createUser(@RequestBody Map<String, Object> req, Authentication auth) {
         String email = (String) req.get("email");
         String password = (String) req.get("password");
         String fullName = (String) req.get("fullName");
@@ -253,11 +259,12 @@ public class SuperAdminController {
                 .build();
 
         user = userRepository.save(user);
+        auditLogService.log(auth.getName(), "SUPER_ADMIN_USER_CREATE", "Created user account: " + user.getEmail() + " with role " + user.getRole());
         return ResponseEntity.ok(user);
     }
 
     @PutMapping("/users/{id}")
-    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody Map<String, Object> req) {
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody Map<String, Object> req, Authentication auth) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -299,21 +306,23 @@ public class SuperAdminController {
         }
 
         user = userRepository.save(user);
+        auditLogService.log(auth.getName(), "SUPER_ADMIN_USER_UPDATE", "Updated user account: " + user.getEmail() + " (#" + user.getId() + ")");
         return ResponseEntity.ok(user);
     }
 
     @PostMapping("/users/{id}/toggle-active")
-    public ResponseEntity<?> toggleUserActive(@PathVariable Long id) {
+    public ResponseEntity<?> toggleUserActive(@PathVariable Long id, Authentication auth) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         user.setActive(!user.isActive());
         user = userRepository.save(user);
+        auditLogService.log(auth.getName(), "SUPER_ADMIN_USER_TOGGLE", "Toggled active status for user: " + user.getEmail() + " -> " + (user.isActive() ? "ACTIVE" : "DISABLED"));
         return ResponseEntity.ok(user);
     }
 
     @DeleteMapping("/users/{id}")
     @Transactional
-    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+    public ResponseEntity<?> deleteUser(@PathVariable Long id, Authentication auth) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -337,6 +346,7 @@ public class SuperAdminController {
         uploadJobRepository.deleteAll(jobs);
 
         userRepository.delete(user);
+        auditLogService.log(auth.getName(), "SUPER_ADMIN_USER_DELETE", "Deleted user account: " + user.getEmail() + " (#" + user.getId() + ")");
         return ResponseEntity.ok("User deleted successfully");
     }
 }

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api/communities")
@@ -87,6 +88,7 @@ public class CommunityController {
 
     @GetMapping("/join-requests/pending")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional(readOnly = true)
     public List<JoinRequestResponse> pendingRequests(
             @RequestParam(required = false) Long communityId,
             Authentication authentication
@@ -125,6 +127,7 @@ public class CommunityController {
 
     @GetMapping("/my-requests")
     @PreAuthorize("hasRole('RESIDENT')")
+    @Transactional(readOnly = true)
     public List<MyJoinRequestResponse> myRequests(Authentication authentication) {
 
         User resident = userRepository.findByEmail(authentication.getName())
@@ -143,6 +146,7 @@ public class CommunityController {
 
     @PostMapping("/join-requests/{requestId}/approve")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional
     public ResponseEntity<?> approveJoinRequest(
             @PathVariable Long requestId,
             Authentication authentication
@@ -176,6 +180,7 @@ public class CommunityController {
 
     @PostMapping("/join-requests/{requestId}/reject")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional
     public ResponseEntity<?> rejectJoinRequest(
             @PathVariable Long requestId,
             Authentication authentication

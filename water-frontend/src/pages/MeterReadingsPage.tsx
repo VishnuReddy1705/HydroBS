@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Upload, Search, Calendar, FileText, CheckCircle2, XCircle, AlertCircle, 
+  Upload, Search, FileText, CheckCircle2, AlertCircle, 
   ChevronLeft, ChevronRight, Download, Printer, Plus, Info, RefreshCw 
 } from 'lucide-react';
 import { waterService, type Reading, type ImportJob } from '../services/waterService';
-import { residentService } from '../services/residentService';
 import { toast } from 'sonner';
 
 export default function MeterReadingsPage() {
@@ -51,7 +50,7 @@ export default function MeterReadingsPage() {
       });
       setReadings(data.content);
       setTotalElements(data.totalElements);
-    } catch (err) {
+    } catch  {
       toast.error('Failed to load meter readings.');
     } finally {
       setLoading(false);

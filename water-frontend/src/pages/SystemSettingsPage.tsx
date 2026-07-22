@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, Loader2, Globe, DollarSign, Clock, HelpCircle, Shield, Sliders, RefreshCw } from 'lucide-react';
+import { Save, Loader2, DollarSign, HelpCircle, Shield, Sliders, RefreshCw } from 'lucide-react';
 import api from '@/api';
 import { toast } from 'sonner';
 
@@ -22,7 +22,7 @@ export default function SystemSettingsPage() {
       setLoading(true);
       const res = await api.get('/api/settings');
       setSettings(res.data || []);
-    } catch (err) {
+    } catch  {
       toast.error('Failed to load system settings');
     } finally {
       setLoading(false);
@@ -42,14 +42,14 @@ export default function SystemSettingsPage() {
     setSaving(true);
     try {
       // Map back to key -> value map
-      const payload: Record<String, String> = {};
+      const payload: Record<string, string> = {};
       settings.forEach(s => {
         payload[s.settingKey] = s.settingValue;
       });
 
       await api.post('/api/settings', payload);
       toast.success('System configurations updated successfully');
-    } catch (err) {
+    } catch  {
       toast.error('Failed to update system settings');
     } finally {
       setSaving(false);

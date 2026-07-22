@@ -282,11 +282,24 @@ public class AnalyticsService {
         paymentStatusDistribution.add(createStatusPoint("Overdue", overdue));
         charts.put("paymentStatusDistribution", paymentStatusDistribution);
 
-        // 7. Payment method distribution (mocked/simulated or read from Payment entities)
+        // 7. Payment method distribution (read from real Payment entities)
+        List<Payment> communityPayments = paymentRepository.findAll().stream()
+                .filter(p -> p.getBill() != null)
+                .filter(p -> finalCommId == null || (p.getBill().getCommunity() != null && p.getBill().getCommunity().getId().equals(finalCommId)))
+                .toList();
+
+        Map<String, Long> methodCounts = communityPayments.stream()
+                .filter(p -> "COMPLETED".equalsIgnoreCase(p.getStatus()) || "REFUNDED".equalsIgnoreCase(p.getStatus()))
+                .collect(Collectors.groupingBy(Payment::getPaymentMethod, Collectors.counting()));
+
         List<Map<String, Object>> paymentMethods = new ArrayList<>();
-        paymentMethods.add(createStatusPoint("UPI / Razorpay", paid * 7 / 10));
-        paymentMethods.add(createStatusPoint("Credit/Debit Card", paid * 2 / 10));
-        paymentMethods.add(createStatusPoint("Net Banking", paid - (paid * 7 / 10) - (paid * 2 / 10)));
+        if (methodCounts.isEmpty()) {
+            paymentMethods.add(createStatusPoint("No Transactions", 0L));
+        } else {
+            methodCounts.forEach((method, count) -> {
+                paymentMethods.add(createStatusPoint(method, count));
+            });
+        }
         charts.put("paymentMethods", paymentMethods);
 
         // 8. Meter Analytics
