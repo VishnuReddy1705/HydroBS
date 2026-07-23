@@ -24,4 +24,5 @@ public class RegisterResidentRequest {
     private String password;
     @NotBlank(message = "Flat number is required")
     private String flatNumber;
+    private Long communityId;
 }

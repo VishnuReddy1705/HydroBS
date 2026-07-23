@@ -1021,14 +1021,36 @@ public class DashboardService {
 
         List<Map<String, Object>> recentBillsList = waterBillRepository.findByResidentId(resident.getId()).stream()
                 .sorted((a, b) -> b.getBillingMonth().compareTo(a.getBillingMonth()))
-                .limit(5)
+                .limit(20)
                 .map(b -> {
                     Map<String, Object> map = new HashMap<>();
+                    map.put("id", b.getId());
                     map.put("billNo", "INV-" + b.getId());
+                    map.put("billingMonth", b.getBillingMonth().toString());
+                    LocalDate startDate = b.getBillingStartDate() != null ? b.getBillingStartDate() : b.getBillingMonth().withDayOfMonth(1);
+                    LocalDate endDate = b.getBillingEndDate() != null ? b.getBillingEndDate() : b.getBillingMonth().withDayOfMonth(b.getBillingMonth().lengthOfMonth());
+                    map.put("billingStartDate", startDate.toString());
+                    map.put("billingEndDate", endDate.toString());
                     map.put("month", b.getBillingMonth().getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH) + " " + b.getBillingMonth().getYear());
                     map.put("usage", b.getTotalUsage().setScale(0, RoundingMode.HALF_UP) + " L");
+                    map.put("totalUsageNum", b.getTotalUsage());
+                    BigDecimal t1Limit = b.getTier1LimitLitres() != null ? b.getTier1LimitLitres() : (b.getCommunity() != null && b.getCommunity().getTier1LimitLitres() != null ? b.getCommunity().getTier1LimitLitres() : new BigDecimal("5000.00"));
+                    BigDecimal t1Rate = b.getTier1Rate() != null ? b.getTier1Rate() : (b.getCommunity() != null && b.getCommunity().getTier1Rate() != null ? b.getCommunity().getTier1Rate() : new BigDecimal("1.00"));
+                    BigDecimal t2Rate = b.getTier2Rate() != null ? b.getTier2Rate() : (b.getCommunity() != null && b.getCommunity().getTier2Rate() != null ? b.getCommunity().getTier2Rate() : new BigDecimal("13.00"));
+                    BigDecimal taxRate = b.getCommunity() != null && b.getCommunity().getTaxRate() != null ? b.getCommunity().getTaxRate() : new BigDecimal("6.00");
+                    map.put("tier1LimitLitres", t1Limit);
+                    map.put("tier1Rate", t1Rate);
+                    map.put("tier2Rate", t2Rate);
+                    map.put("taxRate", taxRate);
+                    map.put("tariffRate", b.getTariffRate());
+                    map.put("taxAmount", b.getTaxAmount());
+                    map.put("serviceCharge", b.getServiceCharge());
+                    map.put("lateFee", b.getLateFee());
+                    map.put("discountAmount", b.getDiscountAmount());
                     map.put("amount", b.getAmount());
                     map.put("status", b.getStatus());
+                    map.put("dueDate", b.getDueDate() != null ? b.getDueDate().toString() : null);
+                    map.put("generatedAt", b.getGeneratedAt() != null ? b.getGeneratedAt().toString() : null);
                     return map;
                 })
                 .toList();

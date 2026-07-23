@@ -20,11 +20,19 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.wumbap.wumbap.entity.Community;
+import com.wumbap.wumbap.entity.CommunityJoinRequest;
+import com.wumbap.wumbap.entity.JoinRequestStatus;
+import com.wumbap.wumbap.repository.CommunityJoinRequestRepository;
+import com.wumbap.wumbap.repository.CommunityRepository;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final CommunityRepository communityRepository;
+    private final CommunityJoinRequestRepository joinRequestRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
@@ -46,8 +54,22 @@ public class AuthService {
                 .verificationToken(UUID.randomUUID().toString())
                 .build();
 
-        userRepository.save(user);
+        user = userRepository.save(user);
         auditLogService.log(user.getEmail(), "RESIDENT_REGISTERED", "Resident user self-registered");
+
+        // Automatically create a pending CommunityJoinRequest if communityId is supplied
+        if (request.getCommunityId() != null) {
+            Optional<Community> communityOpt = communityRepository.findById(request.getCommunityId());
+            if (communityOpt.isPresent()) {
+                CommunityJoinRequest joinRequest = CommunityJoinRequest.builder()
+                        .user(user)
+                        .community(communityOpt.get())
+                        .status(JoinRequestStatus.PENDING)
+                        .requestedAt(LocalDateTime.now())
+                        .build();
+                joinRequestRepository.save(joinRequest);
+            }
+        }
 
         // Simulate sending verification email
         System.out.println("Verification Email Link: http://localhost:5173/verify-email?token=" + user.getVerificationToken());

@@ -252,10 +252,13 @@ public class WaterController {
                     meterReadingRepository.save(meterReading);
                     successCount++;
 
-                    // Recalculate and update resident bill for month
+                    // Recalculate and update resident bill for month and send email ONLY to this resident
                     try {
                         String uBy = (job.getUploadedBy() != null && job.getUploadedBy().getEmail() != null) ? job.getUploadedBy().getEmail() : "CSV Upload";
-                        billingEngineService.generateSingleResidentBill(resident, community, readingDate.withDayOfMonth(1), uBy, "CSV reading bill generation", true);
+                        WaterBill csvBill = billingEngineService.generateSingleResidentBill(resident, community, readingDate.withDayOfMonth(1), uBy, "CSV reading bill generation", true);
+                        if (csvBill != null) {
+                            emailService.sendWaterBillEmail(csvBill);
+                        }
                     } catch (Exception ex) {
                         System.err.println("Error generating bill for resident " + resident.getId() + " after CSV upload: " + ex.getMessage());
                     }
@@ -432,6 +435,13 @@ public class WaterController {
                     map.put("billingStartDate", b.getBillingStartDate() != null ? b.getBillingStartDate().toString() : null);
                     map.put("billingEndDate", b.getBillingEndDate() != null ? b.getBillingEndDate().toString() : null);
                     map.put("totalUsage", b.getTotalUsage());
+                    BigDecimal t1Limit = b.getTier1LimitLitres() != null ? b.getTier1LimitLitres() : (b.getCommunity() != null && b.getCommunity().getTier1LimitLitres() != null ? b.getCommunity().getTier1LimitLitres() : new BigDecimal("10000.00"));
+                    BigDecimal t1Rate = b.getTier1Rate() != null ? b.getTier1Rate() : (b.getCommunity() != null && b.getCommunity().getTier1Rate() != null ? b.getCommunity().getTier1Rate() : new BigDecimal("1.00"));
+                    BigDecimal t2Rate = b.getTier2Rate() != null ? b.getTier2Rate() : (b.getCommunity() != null && b.getCommunity().getTier2Rate() != null ? b.getCommunity().getTier2Rate() : new BigDecimal("3.00"));
+                    map.put("tier1LimitLitres", t1Limit);
+                    map.put("tier1Rate", t1Rate);
+                    map.put("tier2Rate", t2Rate);
+                    map.put("serviceCharge", b.getServiceCharge());
                     map.put("tariffRate", b.getTariffRate());
                     map.put("taxAmount", b.getTaxAmount());
                     map.put("lateFee", b.getLateFee());
@@ -577,9 +587,12 @@ public class WaterController {
                 .build();
         calendarEventRepository.save(manualEvent);
 
-        // Automatically calculate & generate bill for resident based on tariff
+        // Automatically calculate & generate bill for resident based on tariff and send email ONLY to this resident
         try {
-            billingEngineService.generateSingleResidentBill(resident, community, date.withDayOfMonth(1), caller.getEmail(), "Manual reading bill generation", true);
+            WaterBill manualBill = billingEngineService.generateSingleResidentBill(resident, community, date.withDayOfMonth(1), caller.getEmail(), "Manual reading bill generation", true);
+            if (manualBill != null) {
+                emailService.sendWaterBillEmail(manualBill);
+            }
         } catch (Exception e) {
             System.err.println("Error auto-generating bill after manual reading: " + e.getMessage());
         }
@@ -650,13 +663,13 @@ public class WaterController {
         if (req.get("dueDateDays") != null) community.setDueDateDays(Integer.valueOf(req.get("dueDateDays").toString()));
 
         communityRepository.save(community);
+        communityRepository.flush();
 
-        // Instantly apply settings: recalculate bills for current month
-        LocalDate billingMonth = LocalDate.now().withDayOfMonth(1);
-        calculateBillsForCommunity(community, billingMonth);
+        // DO NOT retroactively modify existing bills! Past generated bills remain untouched as historical records.
+        // New bills generated on subsequent meter reading submissions will automatically fetch these saved DB rates.
 
-        auditLogService.log(auth.getName(), "BILLING_SETTINGS_UPDATE", "Updated billing settings for community: " + community.getName());
-        return ResponseEntity.ok("Community billing configurations updated successfully.");
+        auditLogService.log(auth.getName(), "BILLING_SETTINGS_UPDATE", "Updated and published billing settings for community: " + community.getName());
+        return ResponseEntity.ok("Community tariff plan published and saved to database successfully.");
     }
 
     @GetMapping("/bills/{id}/pdf")

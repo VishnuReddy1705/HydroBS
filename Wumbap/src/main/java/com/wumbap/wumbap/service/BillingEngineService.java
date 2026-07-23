@@ -38,6 +38,7 @@ public class BillingEngineService {
     private final AuditLogRepository auditLogRepository;
     private final BillingCycleRepository billingCycleRepository;
     private final BulkWaterPurchaseRepository bulkWaterPurchaseRepository;
+    private final EmailService emailService;
 
     @Transactional
     public List<BillResponse> generateBills(BillGenerationRequest request, String generatedBy) {
@@ -339,8 +340,11 @@ public class BillingEngineService {
             }
         }
 
+        // Fetch fresh community settings from database to ensure real-time saved tariff plan rates are applied
+        Community freshCommunity = communityRepository.findById(community.getId()).orElse(community);
+
         // Find active tariff for community
-        Optional<Tariff> activeTariffOpt = tariffRepository.findByCommunityIdAndIsActiveTrue(community.getId());
+        Optional<Tariff> activeTariffOpt = tariffRepository.findByCommunityIdAndIsActiveTrue(freshCommunity.getId());
 
         BigDecimal consumptionCharge = BigDecimal.ZERO;
         BigDecimal baseCharge = BigDecimal.ZERO;
@@ -354,32 +358,40 @@ public class BillingEngineService {
         BigDecimal penalty = BigDecimal.ZERO;
         BigDecimal discount = BigDecimal.ZERO;
         BigDecimal subsidy = BigDecimal.ZERO;
-        Integer dueDays = 15;
+        Integer dueDays = 6;
         String tariffModel = "PER_UNIT";
         Tariff tariff = null;
+
+        BigDecimal tier1Limit = freshCommunity.getTier1LimitLitres() != null ? freshCommunity.getTier1LimitLitres() : new BigDecimal("5000.00");
+        BigDecimal tier1Rate = freshCommunity.getTier1Rate() != null ? freshCommunity.getTier1Rate() : new BigDecimal("1.00");
+        BigDecimal tier2Rate = freshCommunity.getTier2Rate() != null ? freshCommunity.getTier2Rate() : new BigDecimal("13.00");
 
         if (activeTariffOpt.isPresent()) {
             tariff = activeTariffOpt.get();
             tariffModel = tariff.getModel();
-            baseCharge = tariff.getBaseCharge();
-            unitPrice = tariff.getUnitPrice();
-            minimumCharge = tariff.getMinimumCharge();
-            serviceCharge = tariff.getServiceCharge();
-            maintenanceCharge = tariff.getMaintenanceCharge();
-            sewageCharge = tariff.getSewageCharge();
-            taxPercentage = tariff.getTaxPercentage();
-            lateFee = tariff.getLateFee();
-            penalty = tariff.getPenalty();
-            discount = tariff.getDiscount();
-            subsidy = tariff.getSubsidy();
-            dueDays = tariff.getDueDays();
+            baseCharge = tariff.getBaseCharge() != null ? tariff.getBaseCharge() : BigDecimal.ZERO;
+            unitPrice = tariff.getUnitPrice() != null ? tariff.getUnitPrice() : tier1Rate;
+            minimumCharge = tariff.getMinimumCharge() != null ? tariff.getMinimumCharge() : BigDecimal.ZERO;
+            serviceCharge = tariff.getServiceCharge() != null ? tariff.getServiceCharge() : freshCommunity.getFixedServiceCharge();
+            if (serviceCharge == null) serviceCharge = new BigDecimal("1.00");
+            maintenanceCharge = tariff.getMaintenanceCharge() != null ? tariff.getMaintenanceCharge() : BigDecimal.ZERO;
+            sewageCharge = tariff.getSewageCharge() != null ? tariff.getSewageCharge() : BigDecimal.ZERO;
+            taxPercentage = tariff.getTaxPercentage() != null ? tariff.getTaxPercentage() : freshCommunity.getTaxRate();
+            if (taxPercentage == null) taxPercentage = new BigDecimal("6.00");
+            lateFee = tariff.getLateFee() != null ? tariff.getLateFee() : freshCommunity.getLateFeeRate();
+            if (lateFee == null) lateFee = BigDecimal.ZERO;
+            penalty = tariff.getPenalty() != null ? tariff.getPenalty() : BigDecimal.ZERO;
+            discount = tariff.getDiscount() != null ? tariff.getDiscount() : freshCommunity.getDiscountRate();
+            if (discount == null) discount = BigDecimal.ZERO;
+            subsidy = tariff.getSubsidy() != null ? tariff.getSubsidy() : BigDecimal.ZERO;
+            dueDays = tariff.getDueDays() != null ? tariff.getDueDays() : freshCommunity.getDueDateDays();
+            if (dueDays == null) dueDays = 6;
 
             if ("FIXED".equalsIgnoreCase(tariffModel)) {
-                consumptionCharge = unitPrice; // or fixed charge
+                consumptionCharge = unitPrice;
             } else if ("PER_UNIT".equalsIgnoreCase(tariffModel)) {
                 consumptionCharge = totalUsage.multiply(unitPrice);
             } else if ("SLAB".equalsIgnoreCase(tariffModel)) {
-                // Progressive Slabs calculation
                 BigDecimal remainingUsage = totalUsage;
                 List<TariffSlab> slabs = tariff.getSlabs().stream()
                         .sorted(Comparator.comparing(TariffSlab::getRangeStart))
@@ -391,34 +403,28 @@ public class BillingEngineService {
                     BigDecimal slabEnd = slab.getRangeEnd();
                     BigDecimal slabRate = slab.getRatePerUnit();
 
-                    BigDecimal slabWidth;
-                    if (slabEnd == null) {
-                        slabWidth = remainingUsage;
-                    } else {
-                        slabWidth = slabEnd.subtract(slabStart);
-                    }
-
+                    BigDecimal slabWidth = slabEnd == null ? remainingUsage : slabEnd.subtract(slabStart);
                     BigDecimal usageInSlab = remainingUsage.min(slabWidth);
                     consumptionCharge = consumptionCharge.add(usageInSlab.multiply(slabRate));
                     remainingUsage = remainingUsage.subtract(usageInSlab);
                 }
+            } else {
+                BigDecimal tier1Usage = totalUsage.min(tier1Limit);
+                BigDecimal tier2Usage = totalUsage.subtract(tier1Usage).max(BigDecimal.ZERO);
+                consumptionCharge = tier1Usage.multiply(tier1Rate).add(tier2Usage.multiply(tier2Rate));
             }
             if (consumptionCharge.compareTo(minimumCharge) < 0) {
                 consumptionCharge = minimumCharge;
             }
         } else {
             // Tiered Tariff Calculation based on Community Settings
-            unitPrice = community.getTariffRate();
-            taxPercentage = community.getTaxRate();
-            lateFee = community.getLateFeeRate();
-            discount = community.getDiscountRate();
-            minimumCharge = community.getMinimumMonthlyCharge();
-            serviceCharge = community.getFixedServiceCharge();
-            dueDays = community.getDueDateDays();
-
-            BigDecimal tier1Limit = community.getTier1LimitLitres() != null ? community.getTier1LimitLitres() : new BigDecimal("10000.00");
-            BigDecimal tier1Rate = community.getTier1Rate() != null ? community.getTier1Rate() : unitPrice;
-            BigDecimal tier2Rate = community.getTier2Rate() != null ? community.getTier2Rate() : unitPrice.multiply(new BigDecimal("1.5"));
+            unitPrice = freshCommunity.getTariffRate() != null ? freshCommunity.getTariffRate() : tier1Rate;
+            taxPercentage = freshCommunity.getTaxRate() != null ? freshCommunity.getTaxRate() : new BigDecimal("6.00");
+            lateFee = freshCommunity.getLateFeeRate() != null ? freshCommunity.getLateFeeRate() : BigDecimal.ZERO;
+            discount = freshCommunity.getDiscountRate() != null ? freshCommunity.getDiscountRate() : BigDecimal.ZERO;
+            minimumCharge = freshCommunity.getMinimumMonthlyCharge() != null ? freshCommunity.getMinimumMonthlyCharge() : BigDecimal.ZERO;
+            serviceCharge = freshCommunity.getFixedServiceCharge() != null ? freshCommunity.getFixedServiceCharge() : new BigDecimal("1.00");
+            dueDays = freshCommunity.getDueDateDays() != null ? freshCommunity.getDueDateDays() : 6;
 
             BigDecimal tier1Usage = totalUsage.min(tier1Limit);
             BigDecimal tier2Usage = totalUsage.subtract(tier1Usage).max(BigDecimal.ZERO);
@@ -440,10 +446,9 @@ public class BillingEngineService {
         // Taxes
         BigDecimal taxAmount = subtotal.multiply(taxPercentage.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP));
 
-        // Discounts (convert flat discount or evaluate percentage discount)
+        // Discounts
         BigDecimal finalDiscount = discount;
         if (!activeTariffOpt.isPresent()) {
-            // If community default, discountRate is a percentage
             finalDiscount = subtotal.multiply(discount.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP));
         }
 
@@ -461,13 +466,16 @@ public class BillingEngineService {
 
         WaterBill bill = WaterBill.builder()
                 .resident(resident)
-                .community(community)
+                .community(freshCommunity)
                 .billingCycle(cycle)
                 .billingMonth(billingMonth)
                 .billingStartDate(start)
                 .billingEndDate(end)
                 .totalUsage(totalUsage)
-                .tariffRate(unitPrice)
+                .tariffRate(tier1Rate)
+                .tier1Rate(tier1Rate)
+                .tier2Rate(tier2Rate)
+                .tier1LimitLitres(tier1Limit)
                 .taxAmount(taxAmount.setScale(2, RoundingMode.HALF_UP))
                 .lateFee(lateFee.setScale(2, RoundingMode.HALF_UP))
                 .discountAmount(finalDiscount.setScale(2, RoundingMode.HALF_UP))
@@ -493,7 +501,7 @@ public class BillingEngineService {
 
         WaterBill savedBill = waterBillRepository.save(bill);
 
-        // Notify Resident
+        // Notify Resident via System
         notificationRepository.save(Notification.builder()
                 .user(resident)
                 .community(community)

@@ -16,7 +16,7 @@ import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, 
   XAxis, YAxis, Tooltip, CartesianGrid, Legend, AreaChart, Area
 } from "recharts";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { CardSkeleton, ChartSkeleton, TableSkeleton, ActivitySkeleton } from "../components/ui/Skeletons";
 import { AnimatedCounter } from "../components/ui/AnimatedCounter";
@@ -53,6 +53,37 @@ export default function ResidentDashboard() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [payingBillId, setPayingBillId] = useState<number | null>(null);
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [breakdownBill, setBreakdownBill] = useState<any>(null);
+
+  const formatCycleDates = (bill: any) => {
+    if (!bill) return "";
+    let startStr = bill.billingStartDate;
+    let endStr = bill.billingEndDate;
+
+    if (!startStr && bill.billingMonth) {
+      startStr = `${bill.billingMonth}-01`;
+    }
+    if (!endStr && bill.billingMonth) {
+      const parts = bill.billingMonth.split("-");
+      if (parts.length === 2) {
+        const y = parseInt(parts[0]);
+        const m = parseInt(parts[1]);
+        const lastDay = new Date(y, m, 0).getDate();
+        endStr = `${bill.billingMonth}-${lastDay}`;
+      }
+    }
+
+    if (startStr && endStr) {
+      const dStart = new Date(startStr);
+      const dEnd = new Date(endStr);
+      if (!isNaN(dStart.getTime()) && !isNaN(dEnd.getTime())) {
+        const startFormatted = dStart.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+        const endFormatted = dEnd.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+        return `${startFormatted} - ${endFormatted}`;
+      }
+    }
+    return bill.month || bill.billingMonth || "Current Cycle";
+  };
 
   // Interactive Calendar States
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -706,25 +737,25 @@ export default function ResidentDashboard() {
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Recent Invoices</h3>
                     <button onClick={() => setSearchParams({ tab: "my-bills" })} className="text-xs text-[#00B4D8] font-bold hover:underline cursor-pointer">View All</button>
                   </div>
-                  <div className="overflow-x-auto max-h-[220px] custom-scrollbar">
+                  <div className="overflow-x-auto max-h-[260px] custom-scrollbar">
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
                         <tr>
-                          <th className="px-5 py-3.5">Invoice #</th>
-                          <th className="px-5 py-3.5">Month</th>
+                          <th className="px-5 py-3.5">ID #</th>
+                          <th className="px-5 py-3.5">Billing Period (Dates)</th>
                           <th className="px-5 py-3.5">Usage</th>
                           <th className="px-5 py-3.5">Amount</th>
                           <th className="px-5 py-3.5">Status</th>
-                          <th className="px-5 py-3.5 text-right">Download</th>
+                          <th className="px-5 py-3.5 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-600 dark:text-slate-300 font-medium">
                         {billsList.length > 0 ? (
-                          billsList.map((bill: any) => (
-                            <tr key={bill.billNo} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                              <td className="px-5 py-3.5 font-bold text-[#0F4C81] dark:text-[#00B4D8]">{bill.billNo}</td>
-                              <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400">{bill.month}</td>
-                              <td className="px-5 py-3.5">{bill.usage}</td>
+                          billsList.map((bill: any, idx: number) => (
+                            <tr key={bill.billNo || idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                              <td className="px-5 py-3.5 font-bold text-[#0F4C81] dark:text-[#00B4D8]">ID: {idx + 1}</td>
+                              <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400 font-mono text-[11px]">{formatCycleDates(bill)}</td>
+                              <td className="px-5 py-3.5 font-semibold">{bill.usage}</td>
                               <td className="px-5 py-3.5 font-bold text-slate-800 dark:text-slate-200">₹{bill.amount}</td>
                               <td className="px-5 py-3.5">
                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
@@ -736,13 +767,31 @@ export default function ResidentDashboard() {
                                 </span>
                               </td>
                               <td className="px-5 py-3.5 text-right">
-                                <button 
-                                  onClick={() => handleDownloadInvoicePdf(parseInt(bill.billNo.replace("INV-", "")))}
-                                  className="px-2 py-1 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg text-[#00B4D8] font-bold tracking-wide transition-all inline-flex items-center gap-1 cursor-pointer text-[10px]"
-                                >
-                                  <Download className="h-3 w-3" />
-                                  PDF
-                                </button>
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={() => setBreakdownBill(bill)}
+                                    className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[#0F4C81] dark:text-[#00B4D8] font-bold rounded-lg transition-all inline-flex items-center gap-1 cursor-pointer text-[10px]"
+                                    title="View Billing Structure Breakdown"
+                                  >
+                                    <Info className="h-3 w-3" /> View Structure
+                                  </button>
+
+                                  {bill.status === "PAID" ? (
+                                    <button 
+                                      onClick={() => handleDownloadInvoicePdf(bill.id || parseInt(bill.billNo.replace("INV-", "")))}
+                                      className="px-2.5 py-1 bg-[#00B4D8] text-white font-bold tracking-wide rounded-lg transition-all inline-flex items-center gap-1 cursor-pointer text-[10px] shadow-xs"
+                                    >
+                                      <Download className="h-3 w-3" /> PDF Invoice
+                                    </button>
+                                  ) : (
+                                    <button 
+                                      onClick={() => handleStartPayment(bill.id || parseInt(bill.billNo.replace("INV-", "")))}
+                                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-all inline-flex items-center gap-1 cursor-pointer text-[10px] shadow-xs"
+                                    >
+                                      <CreditCard className="h-3 w-3" /> Pay Now
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           ))
@@ -877,8 +926,8 @@ export default function ResidentDashboard() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-100">
                   <tr>
-                    <th className="px-5 py-3.5">Invoice ID</th>
-                    <th className="px-5 py-3.5">Billing Cycle</th>
+                    <th className="px-5 py-3.5">ID #</th>
+                    <th className="px-5 py-3.5">Billing Period (Dates)</th>
                     <th className="px-5 py-3.5">Total Flow (Litres)</th>
                     <th className="px-5 py-3.5">Amount</th>
                     <th className="px-5 py-3.5">Status</th>
@@ -887,11 +936,11 @@ export default function ResidentDashboard() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
                   {billsList.length > 0 ? (
-                    billsList.map((bill: any) => (
-                      <tr key={bill.billNo} className="hover:bg-slate-50/50">
-                        <td className="px-5 py-3.5 font-bold text-[#0F4C81]">{bill.billNo}</td>
-                        <td className="px-5 py-3.5 text-slate-400">{bill.month}</td>
-                        <td className="px-5 py-3.5">{bill.usage}</td>
+                    billsList.map((bill: any, idx: number) => (
+                      <tr key={bill.billNo || idx} className="hover:bg-slate-50/50">
+                        <td className="px-5 py-3.5 font-bold text-[#0F4C81]">ID: {idx + 1}</td>
+                        <td className="px-5 py-3.5 text-slate-500 font-mono text-[11px]">{formatCycleDates(bill)}</td>
+                        <td className="px-5 py-3.5 font-semibold">{bill.usage}</td>
                         <td className="px-5 py-3.5 font-bold text-slate-800">₹{bill.amount}</td>
                         <td className="px-5 py-3.5">
                           <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
@@ -904,20 +953,29 @@ export default function ResidentDashboard() {
                         </td>
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {bill.status !== "PAID" && (
+                            <button
+                              onClick={() => setBreakdownBill(bill)}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-[#0F4C81] font-bold rounded-lg transition-all inline-flex items-center gap-1 cursor-pointer text-[10px]"
+                              title="View Billing Structure Breakdown"
+                            >
+                              <Info className="h-3 w-3" /> View Structure
+                            </button>
+
+                            {bill.status === "PAID" ? (
                               <button 
-                                onClick={() => handleStartPayment(bill.id || bill.billId || parseInt(bill.billNo.replace(/\D/g, "")))}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-all inline-flex items-center gap-1 cursor-pointer text-[10px] shadow-sm active:scale-95"
+                                onClick={() => handleDownloadInvoicePdf(bill.id || parseInt(bill.billNo.replace(/\D/g, "")))}
+                                className="px-2.5 py-1 bg-[#00B4D8] text-white font-bold tracking-wide rounded-lg transition-all inline-flex items-center gap-1 cursor-pointer text-[10px] shadow-xs"
+                              >
+                                <Download className="h-3 w-3" /> PDF Invoice
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => handleStartPayment(bill.id || parseInt(bill.billNo.replace(/\D/g, "")))}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-all inline-flex items-center gap-1 cursor-pointer text-[10px] shadow-xs"
                               >
                                 <CreditCard className="h-3 w-3" /> Pay Now
                               </button>
                             )}
-                            <button 
-                              onClick={() => handleDownloadInvoicePdf(bill.id || bill.billId || parseInt(bill.billNo.replace(/\D/g, "")))}
-                              className="px-2 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-[#00B4D8] font-bold tracking-wide transition-all inline-flex items-center gap-1 cursor-pointer text-[10px]"
-                            >
-                              <Download className="h-3 w-3" /> PDF
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1752,6 +1810,161 @@ export default function ResidentDashboard() {
           </div>
         </div>
       )}
+
+      {/* Bill Calculation Breakdown Structure Modal (Warm Cream Theme) */}
+      <AnimatePresence>
+        {breakdownBill && (() => {
+          const totalVol = typeof breakdownBill.totalUsageNum === "number" 
+            ? breakdownBill.totalUsageNum 
+            : typeof breakdownBill.totalUsage === "number"
+            ? breakdownBill.totalUsage
+            : (parseFloat(String(breakdownBill.totalUsageNum || breakdownBill.totalUsage || breakdownBill.usage || "0").replace(/[^0-9.]/g, "")) || 0);
+
+          const t1Limit = parseFloat(breakdownBill.tier1LimitLitres) || 5000;
+          const t1Rate = parseFloat(breakdownBill.tier1Rate) || 1.00;
+          const t2Rate = parseFloat(breakdownBill.tier2Rate) || 13.00;
+          const serviceChargeVal = breakdownBill.serviceCharge !== undefined && breakdownBill.serviceCharge !== null ? parseFloat(breakdownBill.serviceCharge) : 1.00;
+          const taxRateVal = breakdownBill.taxRate !== undefined && breakdownBill.taxRate !== null ? parseFloat(breakdownBill.taxRate) : 6;
+          const taxVal = parseFloat(breakdownBill.taxAmount) || 0.00;
+
+          const t1Vol = Math.min(totalVol, t1Limit);
+          const t2Vol = Math.max(0, totalVol - t1Limit);
+
+          const t1Amount = t1Vol * t1Rate;
+          const t2Amount = t2Vol * t2Rate;
+
+          return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              onClick={() => setBreakdownBill(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-[#FAF6EE] rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#EBE3D5] space-y-6 text-[#2D2926] relative"
+              >
+                <button 
+                  onClick={() => setBreakdownBill(null)}
+                  className="absolute top-5 right-5 h-8 w-8 rounded-full bg-[#EFE8D8] flex items-center justify-center text-[#6B5E4C] hover:text-[#2D2926] transition-colors cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+
+                <div className="border-b border-[#EBE3D5] pb-4">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EFE5CE] text-[#8C6B28] text-[10px] font-bold uppercase tracking-wider mb-2 border border-[#E2D4B5]">
+                    <Info className="h-3.5 w-3.5 text-[#00B4D8]" /> Tiered Tariff Breakdown
+                  </div>
+                  <h3 className="text-xl font-serif font-bold text-[#0F4C81]">Billing Structure</h3>
+                  <p className="text-xs text-[#7A6E5D]">Itemized rate slabs and formula calculations for this period</p>
+                </div>
+
+                <div className="bg-[#F4ECE0] rounded-2xl p-4 space-y-2 text-xs border border-[#E5DAC6]">
+                  <div className="flex justify-between text-[#6B5E4C]">
+                    <span>Resident Name:</span>
+                    <span className="font-bold text-[#2D2926]">{me?.fullName || breakdownBill.residentName || "Resident"}</span>
+                  </div>
+                  <div className="flex justify-between text-[#6B5E4C]">
+                    <span>Flat Number:</span>
+                    <span className="font-bold text-[#2D2926]">{me?.flatNumber || breakdownBill.flatNumber || "Flat -"}</span>
+                  </div>
+                  <div className="flex justify-between text-[#6B5E4C]">
+                    <span>Billing Period (Dates):</span>
+                    <span className="font-mono font-bold text-[#0F4C81]">{formatCycleDates(breakdownBill)}</span>
+                  </div>
+                  <div className="flex justify-between text-[#6B5E4C]">
+                    <span>Total Metered Volume:</span>
+                    <span className="font-mono font-extrabold text-[#00B4D8]">{totalVol.toLocaleString()} L <span className="text-[10px] text-[#7A6E5D]">({(totalVol / 1000).toFixed(2)} kL)</span></span>
+                  </div>
+                </div>
+
+                {/* Itemized Slab Breakdown Table */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#7A6E5D]">Tariff Slab Calculation Items</h4>
+                  <div className="border border-[#E5DAC6] rounded-2xl overflow-hidden text-xs bg-white shadow-xs">
+                    {/* Tier 1 Row */}
+                    <div className="p-3 bg-[#FAF6EE] flex justify-between items-center border-b border-[#EBE3D5]">
+                      <div>
+                        <span className="font-bold text-[#0F4C81] block">Tier 1 Base Usage Slab</span>
+                        <span className="text-[10px] text-[#7A6E5D]">First {t1Vol.toLocaleString()} L @ ₹{t1Rate.toFixed(2)}/L</span>
+                      </div>
+                      <span className="font-mono font-bold text-[#2D2926]">₹{t1Amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+
+                    {/* Tier 2 Row (if excess usage exists) */}
+                    {t2Vol > 0 && (
+                      <div className="p-3 bg-[#FFFDF9] flex justify-between items-center border-b border-[#EBE3D5]">
+                        <div>
+                          <span className="font-bold text-purple-700 block">Tier 2 Excess Usage Slab</span>
+                          <span className="text-[10px] text-purple-500">Excess {t2Vol.toLocaleString()} L @ ₹{t2Rate.toFixed(2)}/L</span>
+                        </div>
+                        <span className="font-mono font-bold text-purple-700">₹{t2Amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
+
+                    {/* Fixed Service Charge */}
+                    <div className="p-3 bg-[#FAF6EE] flex justify-between items-center border-b border-[#EBE3D5]">
+                      <span className="text-[#6B5E4C]">Fixed Infrastructure Service Charge</span>
+                      <span className="font-mono font-bold text-[#2D2926]">₹{serviceChargeVal.toFixed(2)}</span>
+                    </div>
+
+                    {/* Tax */}
+                    <div className="p-3 bg-[#FFFDF9] flex justify-between items-center border-b border-[#EBE3D5]">
+                      <span className="text-[#6B5E4C]">Government Tax & Surcharges ({taxRateVal}%)</span>
+                      <span className="font-mono font-bold text-[#2D2926]">₹{taxVal.toFixed(2)}</span>
+                    </div>
+
+                    {/* Net Total */}
+                    <div className="p-3.5 bg-[#F2E8D5] flex justify-between items-center font-extrabold text-sm text-[#0F4C81]">
+                      <span>Net Total Bill Amount</span>
+                      <span className="font-mono text-base text-[#0F4C81]">₹{parseFloat(breakdownBill.amount || (t1Amount + t2Amount + serviceChargeVal + taxVal)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-2 border-t border-[#EBE3D5]">
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                    breakdownBill.status === "PAID"
+                      ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                      : "bg-amber-100 text-amber-800 border border-amber-300"
+                  }`}>
+                    Status: {breakdownBill.status}
+                  </span>
+
+                  <div className="flex gap-2">
+                    {breakdownBill.status !== "PAID" ? (
+                      <button
+                        onClick={() => {
+                          const bId = breakdownBill.id || parseInt(breakdownBill.billNo.replace(/\D/g, ""));
+                          setBreakdownBill(null);
+                          handleStartPayment(bId);
+                        }}
+                        className="px-5 py-2.5 bg-gradient-to-r from-[#2ECC71] to-[#27ae60] hover:from-emerald-500 hover:to-emerald-700 text-white font-bold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <CreditCard className="h-4 w-4" /> Pay Bill Online
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          const bId = breakdownBill.id || parseInt(breakdownBill.billNo.replace(/\D/g, ""));
+                          handleDownloadInvoicePdf(bId);
+                        }}
+                        className="px-4 py-2.5 bg-[#00B4D8] hover:bg-[#0077B6] text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Download className="h-4 w-4" /> Download Official Invoice
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
     </DashboardLayout>
   );
 }

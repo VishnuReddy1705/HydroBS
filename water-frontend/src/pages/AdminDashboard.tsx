@@ -582,7 +582,7 @@ export default function AdminDashboard() {
         dueDateDays: payload.dueDateDays
       }));
 
-      toast.success("Tiered Tariff & Billing settings saved & published! Active resident bills updated.");
+      toast.success("Tiered Tariff Plan saved & published to database! New meter readings will generate bills with these rates.");
       await fetchDashboardData();
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Failed to save tariff settings."));

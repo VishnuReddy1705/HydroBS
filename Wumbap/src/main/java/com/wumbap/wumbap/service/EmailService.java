@@ -38,7 +38,7 @@ public class EmailService {
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(htmlContent, true);
-            helper.setFrom("no-reply@hydrobs.com", "HydroBS Support");
+            helper.setFrom("hydrobs7.0@gmail.com", "HydroBS Utility Services");
 
             if (attachmentName != null && attachmentBytes != null) {
                 helper.addAttachment(attachmentName, new ByteArrayResource(attachmentBytes));
