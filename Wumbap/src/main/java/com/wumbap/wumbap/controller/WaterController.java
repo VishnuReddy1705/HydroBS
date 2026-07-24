@@ -310,17 +310,6 @@ public class WaterController {
             }
             uploadJobRepository.save(job);
 
-            // Log upload history event in calendar
-            CalendarEvent uploadEvent = CalendarEvent.builder()
-                    .community(community)
-                    .title("CSV Reading Import #" + job.getId())
-                    .description("Uploaded " + successCount + " valid rows, " + duplicateCount + " duplicates, " + invalidCount + " invalid, " + unknownCount + " unknown flats.")
-                    .eventDate(LocalDate.now())
-                    .eventType("UPLOAD_JOB")
-                    .referenceId(job.getId())
-                    .build();
-            calendarEventRepository.save(uploadEvent);
-
             // Automatically recalculate billing cycle records for the current month
             LocalDate billingMonth = LocalDate.now().withDayOfMonth(1);
             calculateBillsForCommunity(community, billingMonth);
@@ -362,16 +351,6 @@ public class WaterController {
                 // ignore
             }
         }
-
-        // Save Calendar event for billing generation milestone
-        CalendarEvent billingEvent = CalendarEvent.builder()
-                .community(community)
-                .title("Billing Cycle Run Completed")
-                .description("Generated water bills for " + generatedCount + " residents in community.")
-                .eventDate(LocalDate.now())
-                .eventType("BILL_GEN")
-                .build();
-        calendarEventRepository.save(billingEvent);
 
         return generatedCount;
     }
@@ -479,6 +458,11 @@ public class WaterController {
         }
 
         String flat = (String) req.get("flatNumber");
+        String meterIdParam = (String) req.get("meterNumber");
+        if (meterIdParam == null || meterIdParam.isBlank()) {
+            meterIdParam = (String) req.get("meterId");
+        }
+
         if (caller.getRole() == Role.RESIDENT && (flat == null || flat.isBlank())) {
             flat = caller.getFlatNumber();
         }
@@ -505,30 +489,38 @@ public class WaterController {
 
         User resident = caller;
         if (caller.getRole() != Role.RESIDENT) {
-            if (flat == null || flat.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body("Flat number is required.");
-            }
-            final String normManualFlat = normalizeFlatNumber(flat);
             final Community targetComm = community;
-            resident = userRepository.findAll().stream()
-                    .filter(u -> u.getCommunity() != null 
-                            && (targetComm == null || u.getCommunity().getId().equals(targetComm.getId()))
-                            && u.getRole() == Role.RESIDENT
-                            && u.getFlatNumber() != null 
-                            && normalizeFlatNumber(u.getFlatNumber()).equals(normManualFlat))
-                    .findFirst()
-                    .orElse(null);
+            
+            // Priority 1: Lookup by Meter ID if provided
+            if (meterIdParam != null && !meterIdParam.isBlank()) {
+                final String normMeter = meterIdParam.trim();
+                resident = userRepository.findAll().stream()
+                        .filter(u -> u.getCommunity() != null 
+                                && (targetComm == null || u.getCommunity().getId().equals(targetComm.getId()))
+                                && u.getRole() == Role.RESIDENT
+                                && u.getMeterNumber() != null 
+                                && u.getMeterNumber().trim().equalsIgnoreCase(normMeter))
+                        .findFirst()
+                        .orElse(null);
+            }
+
+            // Priority 2: Lookup by Flat Number if not found by Meter ID
+            if (resident == null && flat != null && !flat.trim().isEmpty()) {
+                final String normManualFlat = normalizeFlatNumber(flat);
+                resident = userRepository.findAll().stream()
+                        .filter(u -> u.getCommunity() != null 
+                                && (targetComm == null || u.getCommunity().getId().equals(targetComm.getId()))
+                                && u.getRole() == Role.RESIDENT
+                                && u.getFlatNumber() != null 
+                                && normalizeFlatNumber(u.getFlatNumber()).equals(normManualFlat))
+                        .findFirst()
+                        .orElse(null);
+            }
 
             if (resident == null) {
-                return ResponseEntity.badRequest().body("Resident not found for flat " + flat);
+                return ResponseEntity.badRequest().body("Resident not found for Meter ID/Flat: " + (meterIdParam != null ? meterIdParam : flat));
             }
             community = resident.getCommunity();
-        }
-
-        // BLOCK DUPLICATE READINGS ON THE SAME DAY FOR THE RESIDENT
-        Optional<MeterReading> existingOpt = meterReadingRepository.findByResidentIdAndReadingDate(resident.getId(), date);
-        if (existingOpt.isPresent()) {
-            return ResponseEntity.badRequest().body("A meter reading for flat " + resident.getFlatNumber() + " has already been submitted for " + date + ". Duplicate readings on the same day are not allowed.");
         }
 
         // Get or create dummy processing upload job for manual logs
@@ -563,33 +555,35 @@ public class WaterController {
         BigDecimal usageLitres = readingVal;
         BigDecimal currentReading = previousReading.add(usageLitres);
 
-        MeterReading reading = MeterReading.builder()
-                .uploadJob(dummyJob)
-                .community(community)
-                .resident(resident)
-                .readingDate(date)
-                .previousReading(previousReading)
-                .currentReading(currentReading)
-                .usageLitres(usageLitres)
-                .build();
+        MeterReading reading;
+        Optional<MeterReading> existingOpt = meterReadingRepository.findByResidentIdAndReadingDate(resident.getId(), date);
+        if (existingOpt.isPresent()) {
+            reading = existingOpt.get();
+            reading.setPreviousReading(previousReading);
+            reading.setCurrentReading(currentReading);
+            reading.setUsageLitres(usageLitres);
+            if (dummyJob != null) {
+                reading.setUploadJob(dummyJob);
+            }
+        } else {
+            reading = MeterReading.builder()
+                    .uploadJob(dummyJob)
+                    .community(community)
+                    .resident(resident)
+                    .readingDate(date)
+                    .previousReading(previousReading)
+                    .currentReading(currentReading)
+                    .usageLitres(usageLitres)
+                    .build();
+        }
 
         // Run anomaly detection
         detectAndFlagAnomaly(reading, resident);
         meterReadingRepository.save(reading);
 
-        // Save Calendar event for manual reading logged
-        CalendarEvent manualEvent = CalendarEvent.builder()
-                .community(community)
-                .title("Manual Reading: Flat " + resident.getFlatNumber())
-                .description("Logged reading of " + reading.getUsageLitres() + " L on " + date + ".")
-                .eventDate(LocalDate.now())
-                .eventType("UPLOAD_JOB")
-                .build();
-        calendarEventRepository.save(manualEvent);
-
         // Automatically calculate & generate bill for resident based on tariff and send email ONLY to this resident
         try {
-            WaterBill manualBill = billingEngineService.generateSingleResidentBill(resident, community, date.withDayOfMonth(1), caller.getEmail(), "Manual reading bill generation", true);
+            WaterBill manualBill = billingEngineService.generateSingleResidentBill(resident, community, date, caller.getEmail(), "Manual reading bill generation", true);
             if (manualBill != null) {
                 emailService.sendWaterBillEmail(manualBill);
             }
@@ -598,24 +592,30 @@ public class WaterController {
         }
 
         // Trigger notifications and high-usage alerts instantly
-        if (reading.getIsAnomaly() != null && reading.getIsAnomaly()) {
-            Notification alert = Notification.builder()
-                    .user(resident)
-                    .community(community)
-                    .title("Water Anomaly Detected")
-                    .message("Your flat " + resident.getFlatNumber() + " flagged a " + reading.getAnomalyType() + " anomaly on " + date + ": " + reading.getAnomalyNotes())
-                    .type("HIGH_USAGE")
-                    .build();
-            notificationRepository.save(alert);
-        } else {
-            Notification notif = Notification.builder()
-                    .user(resident)
-                    .community(community)
-                    .title("Manual Reading Recorded")
-                    .message("A manual meter reading of " + reading.getUsageLitres() + " L has been logged for " + date + ".")
-                    .type("READING_UPLOADED")
-                    .build();
-            notificationRepository.save(notif);
+        try {
+            if (reading.getIsAnomaly() != null && reading.getIsAnomaly()) {
+                Notification alert = Notification.builder()
+                        .user(resident)
+                        .community(community)
+                        .title("Water Anomaly Detected")
+                        .message("Your flat " + resident.getFlatNumber() + " flagged a " + reading.getAnomalyType() + " anomaly on " + date + ": " + reading.getAnomalyNotes())
+                        .type("HIGH_USAGE")
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                notificationRepository.save(alert);
+            } else {
+                Notification notif = Notification.builder()
+                        .user(resident)
+                        .community(community)
+                        .title("Manual Reading Recorded")
+                        .message("A manual meter reading of " + reading.getUsageLitres() + " L has been logged for " + date + ".")
+                        .type("READING_UPLOADED")
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                notificationRepository.save(notif);
+            }
+        } catch (Exception e) {
+            System.err.println("Skipped notification save: " + e.getMessage());
         }
 
         // Recalculate community billing cycles for the target month
@@ -664,9 +664,6 @@ public class WaterController {
 
         communityRepository.save(community);
         communityRepository.flush();
-
-        // DO NOT retroactively modify existing bills! Past generated bills remain untouched as historical records.
-        // New bills generated on subsequent meter reading submissions will automatically fetch these saved DB rates.
 
         auditLogService.log(auth.getName(), "BILLING_SETTINGS_UPDATE", "Updated and published billing settings for community: " + community.getName());
         return ResponseEntity.ok("Community tariff plan published and saved to database successfully.");

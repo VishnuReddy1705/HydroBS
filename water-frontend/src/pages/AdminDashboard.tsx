@@ -9,7 +9,7 @@ import {
   Users, Droplets, AlertTriangle, Check, X, Upload, Loader2,
   Receipt, ShoppingCart, Clock, AlertCircle, BarChart3, PieChart as PieIcon,
   Search, ArrowRight, TrendingUp, FileText,
-  Bell, User, Download, Plus, Edit, Eye, Trash2, ArrowLeft, RefreshCw
+  Bell, User, Download, Plus, Edit, Eye, Trash2, ArrowLeft, RefreshCw, Gauge
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar,
@@ -136,11 +136,18 @@ export default function AdminDashboard() {
 
   // Manual Reading Modal
   const [showReadingModal, setShowReadingModal] = useState(false);
+  const [readingMeterId, setReadingMeterId] = useState("");
   const [readingFlat, setReadingFlat] = useState("");
-  const [readingDate, setReadingDate] = useState("");
+  const [readingDate, setReadingDate] = useState(new Date().toISOString().split('T')[0]);
   const [readingAmount, setReadingAmount] = useState("");
+  const [selectedResidentName, setSelectedResidentName] = useState("");
   const [submittingReading, setSubmittingReading] = useState(false);
   const [meterReadingsList, setMeterReadingsList] = useState<any[]>([]);
+
+  // Assign Meter ID Modal
+  const [assignMeterResident, setAssignMeterResident] = useState<any>(null);
+  const [assignMeterNumber, setAssignMeterNumber] = useState("");
+  const [savingMeter, setSavingMeter] = useState(false);
 
   // Billing Settings
   const [billingSettings, setBillingSettings] = useState({
@@ -521,16 +528,21 @@ export default function AdminDashboard() {
 
   const handleManualReading = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!readingFlat || !readingDate || !readingAmount) return;
+    if ((!readingFlat && !readingMeterId) || !readingDate || !readingAmount) {
+      toast.error("Please enter Meter ID or Flat Number, Date, and Consumption Reading.");
+      return;
+    }
     setSubmittingReading(true);
     try {
       const res = await api.post("/api/water/readings/manual", {
-        flatNumber: readingFlat,
+        meterNumber: readingMeterId.trim(),
+        flatNumber: readingFlat.trim(),
         readingDate: readingDate,
         reading: parseFloat(readingAmount)
       });
       const newReading = res.data?.reading || res.data || {
         flatNumber: readingFlat,
+        meterNumber: readingMeterId,
         readingDate: readingDate,
         usageLitres: parseFloat(readingAmount),
         currentReading: parseFloat(readingAmount),
@@ -540,14 +552,36 @@ export default function AdminDashboard() {
       setMeterReadingsList(prev => [newReading, ...prev]);
       toast.success("Manual reading submitted & real-time telemetry updated!");
       setShowReadingModal(false);
+      setReadingMeterId("");
       setReadingFlat("");
-      setReadingDate("");
+      setReadingDate(new Date().toISOString().split('T')[0]);
       setReadingAmount("");
+      setSelectedResidentName("");
       await fetchDashboardData();
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Failed to submit reading."));
     } finally {
       setSubmittingReading(false);
+    }
+  };
+
+  const handleSaveMeterAssignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignMeterResident) return;
+    setSavingMeter(true);
+    try {
+      await api.put(`/api/residents/${assignMeterResident.id}/meter`, {
+        meterNumber: assignMeterNumber.trim()
+      });
+      toast.success(`Meter ID '${assignMeterNumber.trim()}' assigned to Flat ${assignMeterResident.flatNumber} successfully!`);
+      setAssignMeterResident(null);
+      setAssignMeterNumber("");
+      await fetchDashboardData();
+      await fetchResidentsList();
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, "Failed to save meter assignment."));
+    } finally {
+      setSavingMeter(false);
     }
   };
 
@@ -1118,11 +1152,11 @@ export default function AdminDashboard() {
                     <tr>
                       <th className="px-5 py-3.5 cursor-pointer" onClick={() => { setResSortBy("flatNumber"); setResSortDir(resSortDir === "asc" ? "desc" : "asc"); }}>Flat</th>
                       <th className="px-5 py-3.5 cursor-pointer" onClick={() => { setResSortBy("fullName"); setResSortDir(resSortDir === "asc" ? "desc" : "asc"); }}>Name</th>
+                      <th className="px-5 py-3.5">Meter ID</th>
                       <th className="px-5 py-3.5">Email</th>
                       <th className="px-5 py-3.5">Phone</th>
                       <th className="px-5 py-3.5">Occupancy</th>
                       <th className="px-5 py-3.5">Status</th>
-                      <th className="px-5 py-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
@@ -1131,9 +1165,39 @@ export default function AdminDashboard() {
                         <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-5 py-3.5 font-bold text-[#0F4C81]">{r.flatNumber}</td>
                           <td className="px-5 py-3.5 font-bold text-slate-800">{r.fullName}</td>
+                          <td className="px-5 py-3.5 font-mono text-slate-700">
+                            {r.meterNumber ? (
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1 font-extrabold text-[#00B4D8] bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-md text-[11px]">
+                                  <Gauge className="h-3 w-3" /> {r.meterNumber}
+                                </span>
+                                <button 
+                                  onClick={() => { setAssignMeterResident(r); setAssignMeterNumber(r.meterNumber || ""); }}
+                                  className="text-[10px] font-bold text-slate-500 hover:text-[#00B4D8] underline cursor-pointer"
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => { setAssignMeterResident(r); setAssignMeterNumber(""); }}
+                                className="text-[10px] font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                              >
+                                <Gauge className="h-3 w-3" /> Assign Meter ID
+                              </button>
+                            )}
+                          </td>
                           <td className="px-5 py-3.5 text-slate-500">{r.email}</td>
-                          <td className="px-5 py-3.5">{r.phoneNumber || "N/A"}</td>
-                          <td className="px-5 py-3.5 capitalize">{r.occupancyType?.toLowerCase() || "Tenant"}</td>
+                          <td className="px-5 py-3.5 font-semibold text-slate-700">{r.phoneNumber || "N/A"}</td>
+                          <td className="px-5 py-3.5">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold capitalize border ${
+                              (r.occupancyType || "").toUpperCase() === "OWNER"
+                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                : "bg-blue-50 text-blue-700 border-blue-200"
+                            }`}>
+                              {r.occupancyType?.toLowerCase() || "tenant"}
+                            </span>
+                          </td>
                           <td className="px-5 py-3.5">
                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${
                               r.isActive !== false
@@ -1142,50 +1206,6 @@ export default function AdminDashboard() {
                             }`}>
                               {r.isActive !== false ? "Active" : "Inactive"}
                             </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-right flex justify-end gap-1.5">
-                            <button
-                              onClick={() => setSearchParams({ tab: "residents", id: r.id.toString() })}
-                              className="p-1.5 bg-slate-50 hover:bg-slate-100 text-[#0F4C81] rounded-lg cursor-pointer"
-                              title="View details"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </button>
-                            <button 
-                              onClick={() => openResModal(r)}
-                              className="p-1.5 bg-slate-50 hover:bg-slate-100 text-[#00B4D8] rounded-lg cursor-pointer"
-                              title="Edit details"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </button>
-                            <button 
-                              onClick={() => handleToggleResStatus(r.id, !r.isActive)}
-                              className="p-1.5 bg-slate-50 hover:bg-slate-100 text-[#2ECC71] rounded-lg cursor-pointer"
-                              title={r.isActive ? "Deactivate" : "Activate"}
-                            >
-                              <Check className="h-3.5 w-3.5" />
-                            </button>
-                            <button 
-                              onClick={() => openTransferModal(r)}
-                              className="p-1.5 bg-slate-50 hover:bg-slate-100 text-amber-600 rounded-lg cursor-pointer"
-                              title="Transfer Unit"
-                            >
-                              <ArrowRight className="h-3.5 w-3.5" />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteOrArchiveRes(r.id, r.fullName, true)}
-                              className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-400 rounded-lg cursor-pointer"
-                              title="Archive resident"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteOrArchiveRes(r.id, r.fullName, false)}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg cursor-pointer"
-                              title="Delete permanently"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
                           </td>
                         </tr>
                       ))
@@ -1436,7 +1456,7 @@ export default function AdminDashboard() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
                 onClick={() => setShowReadingModal(false)}
               >
                 <motion.div
@@ -1444,29 +1464,82 @@ export default function AdminDashboard() {
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.95, opacity: 0 }}
                   onClick={(e) => e.stopPropagation()}
-                  className="bg-white rounded-3xl p-6 w-full max-w-md shadow-xl border border-slate-100"
+                  className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 space-y-4 text-slate-900"
                 >
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-[#0F4C81]">Add Manual Reading</h3>
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <div>
+                      <h3 className="text-lg font-bold text-[#0F4C81]">Add Manual Water Reading</h3>
+                      <p className="text-xs text-slate-500 font-medium">Log water meter consumption by Meter ID or Flat</p>
+                    </div>
                     <button onClick={() => setShowReadingModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer"><X className="h-5 w-5" /></button>
                   </div>
                   <form onSubmit={handleManualReading} className="space-y-4">
                     <div>
-                      <label className="text-xs font-bold text-slate-500 block mb-1">Flat Number</label>
-                      <input type="text" value={readingFlat} onChange={(e) => setReadingFlat(e.target.value)} placeholder="e.g. A-101" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 focus:border-[#00B4D8]" required />
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Water Meter ID / Serial Number</label>
+                      <input 
+                        type="text" 
+                        value={readingMeterId} 
+                        onChange={(e) => {
+                          const mVal = e.target.value;
+                          setReadingMeterId(mVal);
+                          const match = (resList || []).find((r: any) => r.meterNumber && r.meterNumber.trim().toLowerCase() === mVal.trim().toLowerCase());
+                          if (match) {
+                            setReadingFlat(match.flatNumber);
+                            setSelectedResidentName(match.fullName);
+                          }
+                        }} 
+                        placeholder="e.g. MTR-101" 
+                        className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00B4D8]" 
+                      />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-500 block mb-1">Date</label>
-                      <input type="date" value={readingDate} onChange={(e) => setReadingDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 focus:border-[#00B4D8]" required />
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Flat Number</label>
+                      <input 
+                        type="text" 
+                        value={readingFlat} 
+                        onChange={(e) => {
+                          const fVal = e.target.value;
+                          setReadingFlat(fVal);
+                          const match = (resList || []).find((r: any) => r.flatNumber && r.flatNumber.trim().toLowerCase() === fVal.trim().toLowerCase());
+                          if (match) {
+                            if (match.meterNumber) setReadingMeterId(match.meterNumber);
+                            setSelectedResidentName(match.fullName);
+                          }
+                        }} 
+                        placeholder="e.g. Flat 402 or A-101" 
+                        className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00B4D8]" 
+                        required 
+                      />
+                      {selectedResidentName && (
+                        <p className="text-xs text-[#00B4D8] font-extrabold mt-1">✓ Resident: {selectedResidentName}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-500 block mb-1">Reading Amount (Liters)</label>
-                      <input type="number" step="0.01" value={readingAmount} onChange={(e) => setReadingAmount(e.target.value)} placeholder="e.g. 1250.50" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8]/20 focus:border-[#00B4D8]" required />
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Reading Date (Defaulted to Today)</label>
+                      <input 
+                        type="date" 
+                        value={readingDate || new Date().toISOString().split('T')[0]} 
+                        onChange={(e) => setReadingDate(e.target.value)} 
+                        className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00B4D8]" 
+                        required 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Reading Amount (Liters)</label>
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        value={readingAmount} 
+                        onChange={(e) => setReadingAmount(e.target.value)} 
+                        placeholder="e.g. 1250.50" 
+                        className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00B4D8]" 
+                        required 
+                      />
                     </div>
                     <button
                       type="submit"
                       disabled={submittingReading}
-                      className="w-full bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      className="w-full bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-md"
                     >
                       {submittingReading && <Loader2 className="h-4 w-4 animate-spin" />}
                       Submit Reading
@@ -1476,6 +1549,8 @@ export default function AdminDashboard() {
               </motion.div>
             )}
           </AnimatePresence>
+
+
 
           {recordPaymentBill && (
             <CollectPaymentDialog
@@ -2408,39 +2483,39 @@ export default function AdminDashboard() {
       {/* Register / Edit Resident Modal */}
       <AnimatePresence>
         {showResModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="border border-slate-100 dark:border-slate-800 rounded-[28px] bg-white dark:bg-[#0c1929] p-6 w-full max-w-2xl space-y-4 shadow-2xl text-slate-800 dark:text-slate-100 my-8"
+              className="border border-slate-200 rounded-[28px] bg-white p-6 w-full max-w-2xl space-y-4 shadow-2xl text-slate-900 my-8"
             >
-              <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
-                <h3 className="text-base font-bold text-[#0F4C81] dark:text-[#00B4D8]">{editingRes ? "Edit Resident Profile" : "Register New Resident"}</h3>
-                <button onClick={() => setShowResModal(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-900 cursor-pointer font-bold text-lg">×</button>
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 className="text-lg font-extrabold text-[#0F4C81]">{editingRes ? "Edit Resident Profile" : "Register New Resident"}</h3>
+                <button onClick={() => setShowResModal(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer font-bold text-lg">×</button>
               </div>
 
               <form onSubmit={handleResSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-left max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                 <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Full Name *</label>
+                  <label className="block text-slate-900 font-extrabold">Full Name *</label>
                   <input 
                     type="text" 
                     value={resFullName} 
                     onChange={(e) => setResFullName(e.target.value)} 
                     placeholder="e.g. Aditi Sharma"
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00B4D8]"
                     required
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Email Address *</label>
+                  <label className="block text-slate-900 font-extrabold">Email Address *</label>
                   <input 
                     type="email" 
                     value={resEmail} 
                     onChange={(e) => setResEmail(e.target.value)} 
                     placeholder="e.g. aditi@gmail.com"
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00B4D8]"
                     required
                     disabled={!!editingRes}
                   />
@@ -2448,206 +2523,65 @@ export default function AdminDashboard() {
 
                 {!editingRes && (
                   <div className="space-y-1">
-                    <label className="block text-slate-500 font-bold">Password *</label>
+                    <label className="block text-slate-900 font-extrabold">Password *</label>
                     <input 
                       type="password" 
                       value={resPassword} 
                       onChange={(e) => setResPassword(e.target.value)} 
-                      placeholder="Min 6 characters"
-                      className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
+                      placeholder="Min 8 characters"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00B4D8]"
                       required={!editingRes}
                     />
                   </div>
                 )}
 
                 <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Phone Number</label>
+                  <label className="block text-slate-900 font-extrabold">Phone Number *</label>
                   <input 
-                    type="text" 
+                    type="tel" 
                     value={resPhone} 
                     onChange={(e) => setResPhone(e.target.value)} 
                     placeholder="e.g. +91 98765 43210"
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Gender</label>
-                  <select 
-                    value={resGender} 
-                    onChange={(e) => setResGender(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3 py-2.5 text-slate-700 dark:text-slate-200"
-                  >
-                    <option value="MALE">MALE</option>
-                    <option value="FEMALE">FEMALE</option>
-                    <option value="OTHER">OTHER</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Date of Birth</label>
-                  <input 
-                    type="date" 
-                    value={resDOB} 
-                    onChange={(e) => setResDOB(e.target.value)} 
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
-                  />
-                </div>
-
-                <div className="space-y-1 border-t border-slate-50 dark:border-slate-800 pt-3 md:col-span-2">
-                  <span className="block text-[#00B4D8] font-bold text-xs uppercase tracking-wider mb-2">Location & Flat Details</span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 md:col-span-2">
-                  <div className="space-y-1">
-                    <label className="block text-slate-500 font-bold">Building</label>
-                    <input 
-                      type="text" 
-                      value={resBuilding} 
-                      onChange={(e) => setResBuilding(e.target.value)} 
-                      placeholder="e.g. Wing A"
-                      className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-slate-500 font-bold">Block</label>
-                    <input 
-                      type="text" 
-                      value={resBlock} 
-                      onChange={(e) => setResBlock(e.target.value)} 
-                      placeholder="e.g. B2"
-                      className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-slate-500 font-bold">Floor</label>
-                    <input 
-                      type="number" 
-                      value={resFloor} 
-                      onChange={(e) => setResFloor(e.target.value)} 
-                      placeholder="e.g. 4"
-                      className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Flat Number *</label>
-                  <input 
-                    type="text" 
-                    value={resFlatNumber} 
-                    onChange={(e) => setResFlatNumber(e.target.value)} 
-                    placeholder="e.g. 402"
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00B4D8]"
                     required
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Occupancy Type</label>
+                  <label className="block text-slate-900 font-extrabold">Flat Number *</label>
+                  <input 
+                    type="text" 
+                    value={resFlatNumber} 
+                    onChange={(e) => setResFlatNumber(e.target.value)} 
+                    placeholder="e.g. Flat 402"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00B4D8]"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-slate-900 font-extrabold">Occupancy Type *</label>
                   <select 
                     value={resOccupancyType} 
                     onChange={(e) => setResOccupancyType(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3 py-2.5 text-slate-700 dark:text-slate-200"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-slate-900 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00B4D8]"
                   >
                     <option value="TENANT">TENANT</option>
                     <option value="OWNER">OWNER</option>
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Move-in Date</label>
-                  <input 
-                    type="date" 
-                    value={resMoveInDate} 
-                    onChange={(e) => setResMoveInDate(e.target.value)} 
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Family Size</label>
-                  <input 
-                    type="number" 
-                    value={resFamilySize} 
-                    onChange={(e) => setResFamilySize(e.target.value)} 
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
-                  />
-                </div>
-
-                <div className="space-y-1 border-t border-slate-50 dark:border-slate-800 pt-3 md:col-span-2">
-                  <span className="block text-[#00B4D8] font-bold text-xs uppercase tracking-wider mb-2">Utility & Balance Details</span>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Water Meter Number</label>
-                  <input 
-                    type="text" 
-                    value={resMeterNumber} 
-                    onChange={(e) => setResMeterNumber(e.target.value)} 
-                    placeholder="e.g. MET-998811"
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Initial Water Balance (₹)</label>
-                  <input 
-                    type="number" 
-                    step="0.01"
-                    value={resWaterBalance} 
-                    onChange={(e) => setResWaterBalance(e.target.value)} 
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
-                  />
-                </div>
-
-                <div className="space-y-1 border-t border-slate-50 dark:border-slate-800 pt-3 md:col-span-2">
-                  <span className="block text-[#00B4D8] font-bold text-xs uppercase tracking-wider mb-2">Emergency Details</span>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Emergency Contact Name</label>
-                  <input 
-                    type="text" 
-                    value={resEmergencyName} 
-                    onChange={(e) => setResEmergencyName(e.target.value)} 
-                    placeholder="Contact person name"
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-slate-500 font-bold">Emergency Phone</label>
-                  <input 
-                    type="text" 
-                    value={resEmergencyPhone} 
-                    onChange={(e) => setResEmergencyPhone(e.target.value)} 
-                    placeholder="Contact number"
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200"
-                  />
-                </div>
-
-                <div className="space-y-1 md:col-span-2">
-                  <label className="block text-slate-500 font-bold">General Address</label>
-                  <textarea 
-                    value={resAddress} 
-                    onChange={(e) => setResAddress(e.target.value)} 
-                    placeholder="Detailed mailing address..."
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-transparent rounded-xl px-3.5 py-2.5 text-slate-700 dark:text-slate-200 h-16 resize-none"
-                  />
-                </div>
-
-                <div className="flex gap-4 pt-3.5 justify-end border-t border-slate-100 dark:border-slate-800 md:col-span-2">
+                <div className="flex gap-4 pt-3.5 justify-end border-t border-slate-100 md:col-span-2">
                   <button 
                     type="button" 
                     onClick={() => setShowResModal(false)}
-                    className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 text-slate-600"
+                    className="px-4 py-2 border border-slate-300 rounded-xl hover:bg-slate-100 text-slate-700 font-bold cursor-pointer transition-all"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit" 
-                    className="px-5 py-2 bg-[#00B4D8] hover:bg-[#0F4C81] text-white rounded-xl shadow-md"
+                    className="px-5 py-2 bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] text-white font-extrabold rounded-xl shadow-md cursor-pointer hover:from-[#48CAE4] hover:to-[#00B4D8] transition-all"
                   >
                     Save Resident
                   </button>
@@ -2816,6 +2750,69 @@ export default function AdminDashboard() {
               </form>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Root Assign / Edit Meter ID Modal */}
+      <AnimatePresence>
+        {assignMeterResident && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 text-slate-900"
+            onClick={() => setAssignMeterResident(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 space-y-4 text-slate-900"
+            >
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-lg font-bold text-[#0F4C81]">Assign / Edit Water Meter ID</h3>
+                  <p className="text-xs text-slate-500 font-semibold">Flat {assignMeterResident.flatNumber} — {assignMeterResident.fullName}</p>
+                </div>
+                <button onClick={() => setAssignMeterResident(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveMeterAssignment} className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-900 block mb-1">Water Meter ID / Serial Number</label>
+                  <input
+                    type="text"
+                    value={assignMeterNumber}
+                    onChange={(e) => setAssignMeterNumber(e.target.value)}
+                    placeholder="e.g. MTR-101 or WM-2026-88"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00B4D8]"
+                    required
+                  />
+                  <p className="text-[10px] text-slate-500 font-medium mt-1">Once assigned, manual entries and CSV uploads using this Meter ID will automatically route to Flat {assignMeterResident.flatNumber}.</p>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setAssignMeterResident(null)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingMeter}
+                    className="px-5 py-2 bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] text-white rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-md"
+                  >
+                    {savingMeter ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save Meter ID"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

@@ -38,15 +38,18 @@ public class Notification {
     @Builder.Default
     private boolean isRead = false;
 
-    @Column(name = "is_archived", nullable = false)
+    @Column(name = "is_archived")
     @Builder.Default
     private boolean isArchived = false;
 
+    @Builder.Default
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private LocalDateTime createdAt = LocalDateTime.now();
 
     @PrePersist
     public void onCreate() {
-        createdAt = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 }

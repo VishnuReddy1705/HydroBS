@@ -29,7 +29,8 @@ public class UserController {
                 user.getRole().name(),
                 user.getCommunity() != null ? user.getCommunity().getId() : null,
                 user.getCommunity() != null ? user.getCommunity().getName() : null,
-                user.getFlatNumber()
+                user.getFlatNumber(),
+                user.getMeterNumber()
         );
     }
 }

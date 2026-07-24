@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Building2, Loader2, ArrowLeft, Droplet, User, Mail, Lock, 
-  Building, ChevronRight, Search, X, ChevronDown, Check
+  Building, ChevronRight, Search, X, ChevronDown, Check, Phone
 } from "lucide-react"
 import axios from "axios"
 import { api } from "@/lib/axios"
@@ -28,6 +28,8 @@ export default function Register() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [occupancyType, setOccupancyType] = useState<"TENANT" | "OWNER">("TENANT")
   
   // Admin specific
   const [communityName, setCommunityName] = useState("")
@@ -116,7 +118,9 @@ export default function Register() {
           email,
           password,
           flatNumber,
-          communityId: Number(selectedCommunityId)
+          communityId: Number(selectedCommunityId),
+          phoneNumber,
+          occupancyType
         }
         const res = await api.post("/api/auth/register-resident", payload)
         saveSession(res.data.token, res.data.refreshToken, res.data.role, res.data.fullName || 'User')
@@ -173,9 +177,7 @@ export default function Register() {
           <h1 className="text-3xl font-extrabold tracking-tight text-white mt-3">HydroBS</h1>
         </div>
 
-        <div className={`rounded-[28px] p-8 md:p-10 shadow-2xl backdrop-blur-2xl border transition-all ${
-          step === 2 ? "bg-white border-slate-200" : "bg-white/10 border-white/20 glass-morphic"
-        }`}>
+        <div className="rounded-[28px] p-8 md:p-10 shadow-2xl backdrop-blur-2xl border bg-white border-slate-200 text-slate-900">
           
           <AnimatePresence mode="wait">
             {step === 1 ? (
@@ -186,9 +188,9 @@ export default function Register() {
                 exit={{ opacity: 0, x: 20 }}
                 className="space-y-6"
               >
-                <div className="flex flex-col mb-4">
-                  <h2 className="text-2xl font-bold text-white">Create Account</h2>
-                  <p className="text-sm text-slate-300">Step 1: Choose your user dashboard role</p>
+                <div className="flex flex-col mb-4 text-left">
+                  <h2 className="text-2xl font-extrabold text-slate-900">Create Account</h2>
+                  <p className="text-xs font-extrabold text-slate-600">Step 1: Choose your user dashboard role</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
@@ -197,16 +199,16 @@ export default function Register() {
                     onClick={() => setRole("RESIDENT")}
                     className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex items-start gap-4 ${
                       role === "RESIDENT" 
-                        ? "bg-[#00B4D8]/20 border-[#00B4D8] text-white" 
-                        : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:border-white/20"
+                        ? "bg-cyan-50 border-[#00B4D8] text-slate-900 shadow-md" 
+                        : "bg-slate-50 border-slate-300 text-slate-800 hover:bg-slate-100 hover:border-slate-400"
                     }`}
                   >
                     <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#48CAE4] to-[#00B4D8] flex items-center justify-center text-white shrink-0 shadow-md">
                       <User className="h-5 w-5" />
                     </div>
                     <div className="text-left space-y-1">
-                      <h4 className="font-bold text-white uppercase text-sm">Join as Resident</h4>
-                      <p className="text-xs text-slate-300 font-light leading-relaxed">Join your apartment community, monitor household flow rates, and pay monthly bills.</p>
+                      <h4 className="font-extrabold text-slate-900 uppercase text-sm">Join as Resident</h4>
+                      <p className="text-xs text-slate-700 font-semibold leading-relaxed">Join your apartment community, monitor household flow rates, and pay monthly bills.</p>
                     </div>
                   </div>
 
@@ -215,23 +217,23 @@ export default function Register() {
                     onClick={() => setRole("ADMIN")}
                     className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex items-start gap-4 ${
                       role === "ADMIN" 
-                        ? "bg-[#00B4D8]/20 border-[#00B4D8] text-white" 
-                        : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:border-white/20"
+                        ? "bg-cyan-50 border-[#00B4D8] text-slate-900 shadow-md" 
+                        : "bg-slate-50 border-slate-300 text-slate-800 hover:bg-slate-100 hover:border-slate-400"
                     }`}
                   >
                     <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#0F4C81] to-[#0B3A63] flex items-center justify-center text-white shrink-0 shadow-md">
                       <Building2 className="h-5 w-5" />
                     </div>
                     <div className="text-left space-y-1">
-                      <h4 className="font-bold text-white uppercase text-sm">Create Community Admin</h4>
-                      <p className="text-xs text-slate-300 font-light leading-relaxed">Register a new community, configure water tariffs, and handle resident bill allocations.</p>
+                      <h4 className="font-extrabold text-slate-900 uppercase text-sm">Create Community Admin</h4>
+                      <p className="text-xs text-slate-700 font-semibold leading-relaxed">Register a new community, configure water tariffs, and handle resident bill allocations.</p>
                     </div>
                   </div>
                 </div>
 
                 <button
                   onClick={handleNextStep}
-                  className="w-full bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] hover:from-[#48CAE4] hover:to-[#00B4D8] text-white font-bold py-3.5 rounded-2xl transition-all text-sm tracking-wide mt-4 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg"
+                  className="w-full bg-gradient-to-r from-[#00B4D8] to-[#0F4C81] hover:from-[#48CAE4] hover:to-[#00B4D8] text-white font-extrabold py-3.5 rounded-2xl transition-all text-sm tracking-wide mt-4 flex items-center justify-center gap-1.5 cursor-pointer shadow-lg"
                 >
                   Continue
                   <ChevronRight className="h-4 w-4" />
@@ -343,6 +345,37 @@ export default function Register() {
                           />
                         </div>
                       </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-xs font-extrabold text-slate-900 tracking-wider uppercase pl-1">Phone Number</label>
+                        <div className="relative">
+                          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-500" />
+                          <input 
+                            type="tel" 
+                            placeholder="+91 9876543210"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value)}
+                            className="w-full bg-slate-100 hover:bg-slate-50 border border-slate-300 hover:border-slate-400 rounded-2xl pl-11 pr-4 py-2.5 text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8] transition-all font-bold"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-xs font-extrabold text-slate-900 tracking-wider uppercase pl-1">Occupancy Type</label>
+                        <div className="relative">
+                          <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-500" />
+                          <select 
+                            value={occupancyType}
+                            onChange={(e) => setOccupancyType(e.target.value as "TENANT" | "OWNER")}
+                            className="w-full bg-slate-100 hover:bg-slate-50 border border-slate-300 hover:border-slate-400 rounded-2xl pl-11 pr-8 py-2.5 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B4D8] transition-all font-bold cursor-pointer"
+                          >
+                            <option value="TENANT">Tenant</option>
+                            <option value="OWNER">Owner</option>
+                          </select>
+                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-500 pointer-events-none" />
+                        </div>
+                      </div>
                     </>
                   )}
 
@@ -405,7 +438,7 @@ export default function Register() {
             )}
           </AnimatePresence>
 
-          <p className="text-center text-xs text-slate-600 mt-6 font-medium">
+          <p className="text-center text-xs text-slate-800 font-extrabold mt-6">
             Already have an account? <Link to="/login" className="underline text-[#00B4D8] hover:text-[#0F4C81] font-extrabold">Log in</Link>
           </p>
         </div>

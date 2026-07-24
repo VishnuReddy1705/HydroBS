@@ -25,4 +25,6 @@ public class RegisterResidentRequest {
     @NotBlank(message = "Flat number is required")
     private String flatNumber;
     private Long communityId;
+    private String phoneNumber;
+    private String occupancyType;
 }

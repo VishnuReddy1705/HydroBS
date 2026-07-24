@@ -36,11 +36,14 @@ public class CalendarEvent {
     @Column(name = "reference_id")
     private Long referenceId;
 
+    @Builder.Default
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private LocalDateTime createdAt = LocalDateTime.now();
 
     @PrePersist
     public void onCreate() {
-        createdAt = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 }

@@ -27,34 +27,50 @@ public class EmailService {
         this.mailSender = mailSenderOpt.orElse(null);
     }
 
-    private void sendHtmlEmail(String to, String subject, String htmlContent, String attachmentName, byte[] attachmentBytes) {
-        try {
-            if (mailSender == null) {
-                throw new IllegalStateException("JavaMailSender bean is not configured.");
-            }
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
-            
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(htmlContent, true);
-            helper.setFrom("hydrobs7.0@gmail.com", "HydroBS Utility Services");
-
-            if (attachmentName != null && attachmentBytes != null) {
-                helper.addAttachment(attachmentName, new ByteArrayResource(attachmentBytes));
-            }
-
-            mailSender.send(message);
-            System.out.println("HTML Email successfully sent to " + to);
-        } catch (Exception e) {
-            System.err.println("Failed to send actual email to " + to + " (Mail Server offline/not configured). Print simulation below:");
-            System.out.println("----- HTML EMAIL SIMULATION -----");
-            System.out.println("To: " + to);
-            System.out.println("Subject: " + subject);
-            System.out.println("Attachment: " + (attachmentName != null ? attachmentName : "None"));
-            System.out.println("Body:\n" + htmlContent);
-            System.out.println("---------------------------------");
+    private boolean isValidEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
         }
+        String trimmed = email.trim();
+        if (!trimmed.contains("@") || !trimmed.contains(".")) {
+            return false;
+        }
+        String lower = trimmed.toLowerCase();
+        if (lower.endsWith("@example.com") || lower.endsWith("@test.com") || lower.equals("none") || lower.equals("n/a")) {
+            return false;
+        }
+        return true;
+    }
+
+    private void sendHtmlEmail(String to, String subject, String htmlContent, String attachmentName, byte[] attachmentBytes) {
+        if (!isValidEmail(to)) {
+            System.out.println("Skipping email send: recipient email '" + to + "' is invalid or missing.");
+            return;
+        }
+
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                if (mailSender == null) {
+                    throw new IllegalStateException("JavaMailSender bean is not configured.");
+                }
+                MimeMessage message = mailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+                
+                helper.setTo(to.trim());
+                helper.setSubject(subject);
+                helper.setText(htmlContent, true);
+                helper.setFrom("hydrobs7.0@gmail.com", "HydroBS Utility Services");
+
+                if (attachmentName != null && attachmentBytes != null) {
+                    helper.addAttachment(attachmentName, new ByteArrayResource(attachmentBytes));
+                }
+
+                mailSender.send(message);
+                System.out.println("HTML Email successfully sent asynchronously to " + to);
+            } catch (Exception e) {
+                System.err.println("Async email dispatch skipped/failed for " + to + ": " + e.getMessage());
+            }
+        });
     }
 
     private String getBaseTemplate(String title, String content) {
@@ -253,6 +269,32 @@ public class EmailService {
         
         String attachmentName = "Receipt_" + receipt.getReceiptNumber() + ".pdf";
         sendHtmlEmail(receipt.getResident().getEmail(), "Payment Receipt - " + receipt.getReceiptNumber(), getBaseTemplate("Payment Receipt", content), attachmentName, pdfBytes);
+    }
+
+    public void sendWelcomeResidentEmail(User resident, String plainPassword, String communityName) {
+        if (resident == null || resident.getEmail() == null || resident.getEmail().isBlank()) {
+            return;
+        }
+
+        String loginUrl = frontendBaseUrl + "/login";
+
+        String content = "<h2>Welcome to " + (communityName != null ? communityName : "HydroBS Community") + "!</h2>" +
+                "<p>Dear <strong>" + resident.getFullName() + "</strong>,</p>" +
+                "<p>Your resident user account has been successfully created on the <strong>HydroBS Smart Utility Platform</strong>.</p>" +
+                "<p>You can log in to view your real-time water usage telemetry, inspect billing structures, and make instant online bill payments.</p>" +
+                "<div style='background-color:#f1f5f9; border-left:4px solid #00B4D8; padding:15px; margin:20px 0; border-radius:8px;'>" +
+                "<p style='margin:0 0 8px 0; font-weight:bold; color:#0F4C81;'>🔑 Your Portal Credentials:</p>" +
+                "<p style='margin:4px 0;'><strong>Login URL:</strong> <a href='" + loginUrl + "'>" + loginUrl + "</a></p>" +
+                "<p style='margin:4px 0;'><strong>Email Address:</strong> " + resident.getEmail() + "</p>" +
+                "<p style='margin:4px 0;'><strong>Password:</strong> " + (plainPassword != null ? plainPassword : "[As created]") + "</p>" +
+                "<p style='margin:4px 0;'><strong>Flat Number:</strong> " + (resident.getFlatNumber() != null ? resident.getFlatNumber() : "N/A") + "</p>" +
+                "</div>" +
+                "<p>For safety, please log in and update your password under Profile Settings after your first login.</p>" +
+                "<div style='text-align:center; margin-top:25px;'>" +
+                "<a href='" + loginUrl + "' class='btn' style='color:#ffffff; background-color:#00B4D8; padding:12px 24px; text-decoration:none; border-radius:8px; font-weight:bold; display:inline-block;'>Log In to Dashboard</a>" +
+                "</div>";
+
+        sendHtmlEmail(resident.getEmail(), "Welcome to HydroBS - Your Account Credentials", getBaseTemplate("Welcome to HydroBS", content), null, null);
     }
 }
 

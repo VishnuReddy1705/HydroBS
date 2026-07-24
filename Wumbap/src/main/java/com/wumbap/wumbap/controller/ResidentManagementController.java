@@ -39,6 +39,7 @@ public class ResidentManagementController {
     private final CommunityRepository communityRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
+    private final com.wumbap.wumbap.service.EmailService emailService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
@@ -218,6 +219,13 @@ public class ResidentManagementController {
 
         userRepository.save(resident);
         auditLogService.log(authentication.getName(), "RESIDENT_REGISTER", "Registered resident: " + resident.getEmail() + " in community: " + community.getName());
+        
+        try {
+            emailService.sendWelcomeResidentEmail(resident, req.getPassword(), community != null ? community.getName() : null);
+        } catch (Exception ex) {
+            System.err.println("Failed to send welcome credentials email: " + ex.getMessage());
+        }
+
         return ResponseEntity.ok(mapToProfileResponse(resident));
     }
 
@@ -241,8 +249,11 @@ public class ResidentManagementController {
             }
         }
 
-        if (!resident.getEmail().equalsIgnoreCase(req.getEmail()) && userRepository.existsByEmail(req.getEmail())) {
-            return ResponseEntity.badRequest().body("Email address already registered.");
+        if (req.getEmail() != null && !req.getEmail().isBlank()) {
+            if (!resident.getEmail().equalsIgnoreCase(req.getEmail()) && userRepository.existsByEmail(req.getEmail())) {
+                return ResponseEntity.badRequest().body("Email address already registered.");
+            }
+            resident.setEmail(req.getEmail().trim());
         }
 
         // Validate flat duplicate active occupancy if it changes
@@ -260,34 +271,69 @@ public class ResidentManagementController {
             if (unitOccupied) {
                 return ResponseEntity.badRequest().body("Unit " + req.getFlatNumber() + " is already occupied by an active resident.");
             }
+            resident.setFlatNumber(req.getFlatNumber().trim());
         }
 
-        resident.setEmail(req.getEmail());
         if (req.getPassword() != null && !req.getPassword().isBlank()) {
             resident.setPassword(passwordEncoder.encode(req.getPassword()));
         }
-        resident.setFullName(req.getFullName());
-        resident.setPhoneNumber(req.getPhoneNumber());
-        resident.setProfilePhotoUrl(req.getProfilePhotoUrl());
-        resident.setGender(req.getGender());
-        resident.setDateOfBirth(req.getDateOfBirth());
-        resident.setEmergencyContactName(req.getEmergencyContactName());
-        resident.setEmergencyContactPhone(req.getEmergencyContactPhone());
-        resident.setAddress(req.getAddress());
-        resident.setBuilding(req.getBuilding());
-        resident.setBlock(req.getBlock());
-        resident.setFloor(req.getFloor());
-        resident.setFlatNumber(req.getFlatNumber());
+        if (req.getFullName() != null && !req.getFullName().isBlank()) {
+            resident.setFullName(req.getFullName().trim());
+        }
+        if (req.getPhoneNumber() != null) resident.setPhoneNumber(req.getPhoneNumber());
+        if (req.getProfilePhotoUrl() != null) resident.setProfilePhotoUrl(req.getProfilePhotoUrl());
+        if (req.getGender() != null) resident.setGender(req.getGender());
+        if (req.getDateOfBirth() != null) resident.setDateOfBirth(req.getDateOfBirth());
+        if (req.getEmergencyContactName() != null) resident.setEmergencyContactName(req.getEmergencyContactName());
+        if (req.getEmergencyContactPhone() != null) resident.setEmergencyContactPhone(req.getEmergencyContactPhone());
+        if (req.getAddress() != null) resident.setAddress(req.getAddress());
+        if (req.getBuilding() != null) resident.setBuilding(req.getBuilding());
+        if (req.getBlock() != null) resident.setBlock(req.getBlock());
+        if (req.getFloor() != null) resident.setFloor(req.getFloor());
         if (req.getFamilySize() != null) resident.setFamilySize(req.getFamilySize());
         if (req.getOccupancyType() != null) resident.setOccupancyType(req.getOccupancyType());
         if (req.getMoveInDate() != null) resident.setMoveInDate(req.getMoveInDate());
         if (req.getFlatArea() != null) resident.setFlatArea(req.getFlatArea());
-        resident.setMeterNumber(req.getMeterNumber());
+        if (req.getMeterNumber() != null) resident.setMeterNumber(req.getMeterNumber().trim());
         if (req.getWaterBalance() != null) resident.setWaterBalance(req.getWaterBalance());
         if (req.getIsActive() != null) resident.setActive(req.getIsActive());
 
         userRepository.save(resident);
         auditLogService.log(authentication.getName(), "RESIDENT_UPDATE", "Updated resident details: " + resident.getEmail());
+        return ResponseEntity.ok(mapToProfileResponse(resident));
+    }
+
+    @PutMapping("/{id}/meter")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @Transactional
+    public ResponseEntity<?> assignMeterId(@PathVariable Long id, @RequestBody Map<String, String> body, Authentication authentication) {
+        User caller = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("Logged in user not found"));
+
+        User resident = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Resident not found"));
+
+        if (resident.getRole() != Role.RESIDENT) {
+            return ResponseEntity.badRequest().body("Target user is not a resident.");
+        }
+
+        if (caller.getRole() != Role.SUPER_ADMIN) {
+            if (caller.getCommunity() == null || resident.getCommunity() == null ||
+                    !caller.getCommunity().getId().equals(resident.getCommunity().getId())) {
+                return ResponseEntity.status(403).body("Access Denied: Resident belongs to another community.");
+            }
+        }
+
+        String meterNumber = body.get("meterNumber");
+        if (meterNumber == null || meterNumber.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Meter number is required.");
+        }
+
+        resident.setMeterNumber(meterNumber.trim());
+        userRepository.save(resident);
+        try {
+            auditLogService.log(authentication.getName(), "METER_ASSIGNMENT", "Assigned Meter ID " + meterNumber.trim() + " to resident: " + resident.getEmail());
+        } catch (Exception ignored) {}
         return ResponseEntity.ok(mapToProfileResponse(resident));
     }
 

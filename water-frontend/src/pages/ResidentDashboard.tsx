@@ -79,6 +79,9 @@ export default function ResidentDashboard() {
       if (!isNaN(dStart.getTime()) && !isNaN(dEnd.getTime())) {
         const startFormatted = dStart.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
         const endFormatted = dEnd.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+        if (startFormatted === endFormatted) {
+          return startFormatted;
+        }
         return `${startFormatted} - ${endFormatted}`;
       }
     }
@@ -440,7 +443,7 @@ export default function ResidentDashboard() {
     <DashboardLayout
       role="RESIDENT"
       title={getTabTitle()}
-      subtitle={`${me?.communityName || "No Community"} • Flat ${me?.flatNumber || "N/A"}`}
+      subtitle={`${me?.communityName || "No Community"} • Flat ${me?.flatNumber || "N/A"}${me?.meterNumber ? ` • Meter ID: ${me.meterNumber}` : ""}`}
       onRefresh={handleRefresh}
       isRefreshing={isRefreshing}
     >

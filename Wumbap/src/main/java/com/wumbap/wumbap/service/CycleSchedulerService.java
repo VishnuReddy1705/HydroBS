@@ -159,14 +159,21 @@ public class CycleSchedulerService {
             usageArchiveRepository.save(commArchive);
 
             // Save Calendar timeline milestone event
-            CalendarEvent event = CalendarEvent.builder()
-                    .community(community)
-                    .title(periodType + " Cycle Completed")
-                    .description("Usage statistics archived for cycle " + periodId + ". Total community consumption: " + communityTotal + " L.")
-                    .eventDate(end)
-                    .eventType("REMINDER")
-                    .build();
-            calendarEventRepository.save(event);
+            try {
+                if (community != null) {
+                    CalendarEvent event = CalendarEvent.builder()
+                            .community(community)
+                            .title(periodType + " Cycle Completed")
+                            .description("Usage statistics archived for cycle " + periodId + ". Total community consumption: " + communityTotal + " L.")
+                            .eventDate(end)
+                            .eventType("REMINDER")
+                            .createdAt(LocalDateTime.now())
+                            .build();
+                    calendarEventRepository.save(event);
+                }
+            } catch (Exception e) {
+                log.error("Failed to save archive cycle calendar event: {}", e.getMessage());
+            }
         }
         log.info("Completed cycle archiving for period type: {} (ID: {})", periodType, periodId);
     }

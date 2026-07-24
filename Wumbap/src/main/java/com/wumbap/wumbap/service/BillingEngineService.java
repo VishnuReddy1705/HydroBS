@@ -164,13 +164,18 @@ public class BillingEngineService {
                         waterBillRepository.save(bill);
                         generatedBills.add(bill);
 
-                        notificationRepository.save(Notification.builder()
-                                .user(resident)
-                                .community(community)
-                                .title("New Distributed Water Bill Generated")
-                                .message("Your bill for cycle " + cycle.getName() + " is ready. Amount: " + bill.getAmount() + " INR.")
-                                .type("BILL")
-                                .build());
+                        try {
+                            notificationRepository.save(Notification.builder()
+                                    .user(resident)
+                                    .community(community)
+                                    .title("New Distributed Water Bill Generated")
+                                    .message("Your distributed bulk bill for " + cycle.getStartDate().format(DateTimeFormatter.ofPattern("MMM yyyy")) + " is ready. Amount Due: " + bill.getAmount() + " INR.")
+                                    .type("BILL")
+                                    .createdAt(LocalDateTime.now())
+                                    .build());
+                        } catch (Exception e) {
+                            System.err.println("Skipped notification save: " + e.getMessage());
+                        }
                     }
 
                     // Log audit trail
@@ -303,23 +308,11 @@ public class BillingEngineService {
 
     @Transactional
     public WaterBill generateSingleResidentBill(User resident, Community community, LocalDate billingMonth, String generatedBy, String notes, boolean overwrite, BillingCycle cycle) {
-        LocalDate normalizedMonth = billingMonth != null ? billingMonth.withDayOfMonth(1) : LocalDate.now().withDayOfMonth(1);
-        
-        // Remove any existing UNPAID bills for this resident for the same month to prevent duplicate bill entries
-        List<WaterBill> existingBills = waterBillRepository.findByResidentId(resident.getId()).stream()
-                .filter(b -> b.getBillingMonth() != null 
-                        && b.getBillingMonth().withDayOfMonth(1).equals(normalizedMonth)
-                        && !"PAID".equalsIgnoreCase(b.getStatus()))
-                .toList();
-        if (!existingBills.isEmpty()) {
-            waterBillRepository.deleteAll(existingBills);
-            waterBillRepository.flush();
-        }
+        LocalDate targetDate = billingMonth != null ? billingMonth : LocalDate.now();
 
-        LocalDate start = (cycle != null) ? cycle.getStartDate() : normalizedMonth;
-        LocalDate end = (cycle != null) ? cycle.getEndDate() : normalizedMonth.withDayOfMonth(normalizedMonth.lengthOfMonth());
-
-        // Get readings to calculate usage
+        // Get readings to calculate usage up to this reading date
+        LocalDate start = (cycle != null) ? cycle.getStartDate() : targetDate;
+        LocalDate end = (cycle != null) ? cycle.getEndDate() : targetDate;
         List<MeterReading> readings = meterReadingRepository.findByResidentIdOrderByReadingDateDesc(resident.getId()).stream()
                 .filter(r -> !r.getReadingDate().isBefore(start) && !r.getReadingDate().isAfter(end))
                 .collect(Collectors.toList());
@@ -328,7 +321,14 @@ public class BillingEngineService {
                 .map(MeterReading::getUsageLitres)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Fetch prev/current meter reading indices
+        // If no readings in date range, use latest reading usage if present
+        if (readings.isEmpty()) {
+            Optional<MeterReading> latestOpt = meterReadingRepository.findByResidentIdOrderByReadingDateDesc(resident.getId()).stream().findFirst();
+            if (latestOpt.isPresent()) {
+                totalUsage = latestOpt.get().getUsageLitres();
+            }
+        }
+
         BigDecimal previousReading = BigDecimal.ZERO;
         BigDecimal currentReading = BigDecimal.ZERO;
         if (!readings.isEmpty()) {
@@ -340,10 +340,7 @@ public class BillingEngineService {
             }
         }
 
-        // Fetch fresh community settings from database to ensure real-time saved tariff plan rates are applied
         Community freshCommunity = communityRepository.findById(community.getId()).orElse(community);
-
-        // Find active tariff for community
         Optional<Tariff> activeTariffOpt = tariffRepository.findByCommunityIdAndIsActiveTrue(freshCommunity.getId());
 
         BigDecimal consumptionCharge = BigDecimal.ZERO;
@@ -368,12 +365,13 @@ public class BillingEngineService {
 
         if (activeTariffOpt.isPresent()) {
             tariff = activeTariffOpt.get();
-            tariffModel = tariff.getModel();
-            baseCharge = tariff.getBaseCharge() != null ? tariff.getBaseCharge() : BigDecimal.ZERO;
+            tariffModel = tariff.getModel() != null ? tariff.getModel() : "PER_UNIT";
             unitPrice = tariff.getUnitPrice() != null ? tariff.getUnitPrice() : tier1Rate;
-            minimumCharge = tariff.getMinimumCharge() != null ? tariff.getMinimumCharge() : BigDecimal.ZERO;
+            baseCharge = tariff.getBaseCharge() != null ? tariff.getBaseCharge() : BigDecimal.ZERO;
+            minimumCharge = tariff.getMinimumCharge() != null ? tariff.getMinimumCharge() : freshCommunity.getMinimumMonthlyCharge();
+            if (minimumCharge == null) minimumCharge = BigDecimal.ZERO;
             serviceCharge = tariff.getServiceCharge() != null ? tariff.getServiceCharge() : freshCommunity.getFixedServiceCharge();
-            if (serviceCharge == null) serviceCharge = new BigDecimal("1.00");
+            if (serviceCharge == null) serviceCharge = BigDecimal.ZERO;
             maintenanceCharge = tariff.getMaintenanceCharge() != null ? tariff.getMaintenanceCharge() : BigDecimal.ZERO;
             sewageCharge = tariff.getSewageCharge() != null ? tariff.getSewageCharge() : BigDecimal.ZERO;
             taxPercentage = tariff.getTaxPercentage() != null ? tariff.getTaxPercentage() : freshCommunity.getTaxRate();
@@ -383,7 +381,6 @@ public class BillingEngineService {
             penalty = tariff.getPenalty() != null ? tariff.getPenalty() : BigDecimal.ZERO;
             discount = tariff.getDiscount() != null ? tariff.getDiscount() : freshCommunity.getDiscountRate();
             if (discount == null) discount = BigDecimal.ZERO;
-            subsidy = tariff.getSubsidy() != null ? tariff.getSubsidy() : BigDecimal.ZERO;
             dueDays = tariff.getDueDays() != null ? tariff.getDueDays() : freshCommunity.getDueDateDays();
             if (dueDays == null) dueDays = 6;
 
@@ -417,7 +414,6 @@ public class BillingEngineService {
                 consumptionCharge = minimumCharge;
             }
         } else {
-            // Tiered Tariff Calculation based on Community Settings
             unitPrice = freshCommunity.getTariffRate() != null ? freshCommunity.getTariffRate() : tier1Rate;
             taxPercentage = freshCommunity.getTaxRate() != null ? freshCommunity.getTaxRate() : new BigDecimal("6.00");
             lateFee = freshCommunity.getLateFeeRate() != null ? freshCommunity.getLateFeeRate() : BigDecimal.ZERO;
@@ -436,23 +432,19 @@ public class BillingEngineService {
             }
         }
 
-        // Subtotal calculation
         BigDecimal subtotal = consumptionCharge
                 .add(baseCharge)
                 .add(serviceCharge)
                 .add(maintenanceCharge)
                 .add(sewageCharge);
 
-        // Taxes
         BigDecimal taxAmount = subtotal.multiply(taxPercentage.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP));
 
-        // Discounts
         BigDecimal finalDiscount = discount;
         if (!activeTariffOpt.isPresent()) {
             finalDiscount = subtotal.multiply(discount.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP));
         }
 
-        // Subsidy & Net Total
         BigDecimal finalTotal = subtotal.add(taxAmount).add(penalty).add(lateFee)
                 .subtract(finalDiscount).subtract(subsidy);
 
@@ -460,55 +452,73 @@ public class BillingEngineService {
             finalTotal = BigDecimal.ZERO;
         }
 
-        // Professional Invoice Identifiers
-        String billNo = "HB-" + billingMonth.getYear() + "-" + String.format("%06d", (long)(Math.random() * 1000000));
-        String invNo = "INV-" + billingMonth.getYear() + "-" + String.format("%08d", (long)(Math.random() * 100000000));
+        // Lookup existing bill for this resident for the exact reading date
+        Optional<WaterBill> existingOpt = waterBillRepository.findByResidentId(resident.getId()).stream()
+                .filter(b -> b.getBillingMonth() != null && b.getBillingMonth().equals(targetDate))
+                .findFirst();
 
-        WaterBill bill = WaterBill.builder()
-                .resident(resident)
-                .community(freshCommunity)
-                .billingCycle(cycle)
-                .billingMonth(billingMonth)
-                .billingStartDate(start)
-                .billingEndDate(end)
-                .totalUsage(totalUsage)
-                .tariffRate(tier1Rate)
-                .tier1Rate(tier1Rate)
-                .tier2Rate(tier2Rate)
-                .tier1LimitLitres(tier1Limit)
-                .taxAmount(taxAmount.setScale(2, RoundingMode.HALF_UP))
-                .lateFee(lateFee.setScale(2, RoundingMode.HALF_UP))
-                .discountAmount(finalDiscount.setScale(2, RoundingMode.HALF_UP))
-                .amount(finalTotal.setScale(2, RoundingMode.HALF_UP))
-                .status("GENERATED")
-                .generatedAt(LocalDateTime.now())
-                .dueDate(LocalDate.now().plusDays(dueDays))
-                .billNumber(billNo)
-                .invoiceNumber(invNo)
-                .tariffModel(tariffModel)
-                .previousReading(previousReading.setScale(2, RoundingMode.HALF_UP))
-                .currentReading(currentReading.setScale(2, RoundingMode.HALF_UP))
-                .serviceCharge(serviceCharge.setScale(2, RoundingMode.HALF_UP))
-                .maintenanceCharge(maintenanceCharge.setScale(2, RoundingMode.HALF_UP))
-                .sewageCharge(sewageCharge.setScale(2, RoundingMode.HALF_UP))
-                .penalty(penalty.setScale(2, RoundingMode.HALF_UP))
-                .subsidyAmount(subsidy.setScale(2, RoundingMode.HALF_UP))
-                .revisionCount(0)
-                .notes(notes)
-                .tariff(tariff)
-                .generatedBy(generatedBy)
-                .build();
+        WaterBill bill;
+        if (existingOpt.isPresent()) {
+            bill = existingOpt.get();
+            if ("PAID".equalsIgnoreCase(bill.getStatus())) {
+                return bill;
+            }
+        } else {
+            String billNo = "HB-" + targetDate.getYear() + "-" + String.format("%06d", (long)(Math.random() * 1000000));
+            String invNo = "INV-" + targetDate.getYear() + "-" + String.format("%08d", (long)(Math.random() * 100000000));
+            bill = new WaterBill();
+            bill.setBillNumber(billNo);
+            bill.setInvoiceNumber(invNo);
+            bill.setResident(resident);
+            bill.setCommunity(freshCommunity);
+            bill.setBillingMonth(targetDate);
+            bill.setRevisionCount(0);
+        }
+
+        bill.setBillingCycle(cycle);
+        bill.setBillingStartDate(start);
+        bill.setBillingEndDate(end);
+        bill.setTotalUsage(totalUsage);
+        bill.setTariffRate(tier1Rate);
+        bill.setTier1Rate(tier1Rate);
+        bill.setTier2Rate(tier2Rate);
+        bill.setTier1LimitLitres(tier1Limit);
+        bill.setTaxAmount(taxAmount.setScale(2, RoundingMode.HALF_UP));
+        bill.setLateFee(lateFee.setScale(2, RoundingMode.HALF_UP));
+        bill.setDiscountAmount(finalDiscount.setScale(2, RoundingMode.HALF_UP));
+        bill.setAmount(finalTotal.setScale(2, RoundingMode.HALF_UP));
+        if (bill.getStatus() == null || !"PAID".equalsIgnoreCase(bill.getStatus())) {
+            bill.setStatus("GENERATED");
+        }
+        bill.setGeneratedAt(LocalDateTime.now());
+        bill.setDueDate(LocalDate.now().plusDays(dueDays));
+        bill.setTariffModel(tariffModel);
+        bill.setPreviousReading(previousReading.setScale(2, RoundingMode.HALF_UP));
+        bill.setCurrentReading(currentReading.setScale(2, RoundingMode.HALF_UP));
+        bill.setServiceCharge(serviceCharge.setScale(2, RoundingMode.HALF_UP));
+        bill.setMaintenanceCharge(maintenanceCharge.setScale(2, RoundingMode.HALF_UP));
+        bill.setSewageCharge(sewageCharge.setScale(2, RoundingMode.HALF_UP));
+        bill.setPenalty(penalty.setScale(2, RoundingMode.HALF_UP));
+        bill.setSubsidyAmount(subsidy.setScale(2, RoundingMode.HALF_UP));
+        bill.setNotes(notes);
+        bill.setTariff(tariff);
+        bill.setGeneratedBy(generatedBy);
 
         WaterBill savedBill = waterBillRepository.save(bill);
 
         // Notify Resident via System
-        notificationRepository.save(Notification.builder()
-                .user(resident)
-                .community(community)
-                .title("New Utility Bill Generated")
-                .message("Your bill for " + billingMonth.format(DateTimeFormatter.ofPattern("MMM yyyy")) + " is ready. Amount Due: " + savedBill.getAmount() + " INR.")
-                .type("BILL")
-                .build());
+        try {
+            notificationRepository.save(Notification.builder()
+                    .user(resident)
+                    .community(community)
+                    .title("New Utility Bill Generated")
+                    .message("Your bill for " + targetDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy")) + " is ready. Amount Due: " + savedBill.getAmount() + " INR.")
+                    .type("BILL")
+                    .createdAt(LocalDateTime.now())
+                    .build());
+        } catch (Exception e) {
+            System.err.println("Skipped notification save: " + e.getMessage());
+        }
 
         return savedBill;
     }
@@ -552,13 +562,18 @@ public class BillingEngineService {
         WaterBill savedBill = waterBillRepository.save(bill);
 
         // Notify Resident
-        notificationRepository.save(Notification.builder()
-                .user(bill.getResident())
-                .community(bill.getCommunity())
-                .title("Bill Revised")
-                .message("Your bill for " + bill.getBillingMonth().format(DateTimeFormatter.ofPattern("MMM yyyy")) + " has been revised. New Amount: " + savedBill.getAmount() + " INR.")
-                .type("BILL")
-                .build());
+        try {
+            notificationRepository.save(Notification.builder()
+                    .user(bill.getResident())
+                    .community(bill.getCommunity())
+                    .title("Bill Revised")
+                    .message("Your bill for " + bill.getBillingMonth().format(DateTimeFormatter.ofPattern("MMM yyyy")) + " has been revised. New Amount: " + savedBill.getAmount() + " INR.")
+                    .type("BILL")
+                    .createdAt(LocalDateTime.now())
+                    .build());
+        } catch (Exception e) {
+            System.err.println("Skipped notification save: " + e.getMessage());
+        }
 
         // Log audit trail
         auditLogRepository.save(AuditLog.builder()

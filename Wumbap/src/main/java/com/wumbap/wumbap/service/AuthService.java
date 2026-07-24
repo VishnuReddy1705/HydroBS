@@ -38,6 +38,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final RefreshTokenService refreshTokenService;
     private final AuditLogService auditLogService;
+    private final EmailService emailService;
 
     public AuthResponse register(RegisterResidentRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
@@ -50,6 +51,8 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(Role.RESIDENT)
                 .flatNumber(request.getFlatNumber())
+                .phoneNumber(request.getPhoneNumber())
+                .occupancyType(request.getOccupancyType() != null && !request.getOccupancyType().isBlank() ? request.getOccupancyType().toUpperCase() : "TENANT")
                 .isEmailVerified(false)
                 .verificationToken(UUID.randomUUID().toString())
                 .build();
@@ -57,10 +60,12 @@ public class AuthService {
         user = userRepository.save(user);
         auditLogService.log(user.getEmail(), "RESIDENT_REGISTERED", "Resident user self-registered");
 
+        String communityName = null;
         // Automatically create a pending CommunityJoinRequest if communityId is supplied
         if (request.getCommunityId() != null) {
             Optional<Community> communityOpt = communityRepository.findById(request.getCommunityId());
             if (communityOpt.isPresent()) {
+                communityName = communityOpt.get().getName();
                 CommunityJoinRequest joinRequest = CommunityJoinRequest.builder()
                         .user(user)
                         .community(communityOpt.get())
@@ -69,6 +74,12 @@ public class AuthService {
                         .build();
                 joinRequestRepository.save(joinRequest);
             }
+        }
+
+        try {
+            emailService.sendWelcomeResidentEmail(user, request.getPassword(), communityName);
+        } catch (Exception ex) {
+            System.err.println("Failed to send welcome email upon self registration: " + ex.getMessage());
         }
 
         // Simulate sending verification email

@@ -6,6 +6,7 @@ public record MeResponse(
         String role,
         Long communityId,
         String communityName,
-        String flatNumber
+        String flatNumber,
+        String meterNumber
 ) {
 }
